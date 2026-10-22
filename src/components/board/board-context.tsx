@@ -45,7 +45,11 @@ export function useBoard() {
   return ctx;
 }
 
-const SYNC_INTERVAL_MS = 30_000;
+// Sync is deliberately frugal (free-tier hosting and database): check every
+// 2 minutes, only while the tab is visible and someone is actually using it.
+const SYNC_INTERVAL_MS = 2 * 60_000;
+const IDLE_AFTER_MS = 5 * 60_000; // no mouse/keyboard/touch for this long = idle
+const MIN_GAP_MS = 15_000; // focus/return checks never closer together than this
 
 export function BoardProvider({
   board,
@@ -216,8 +220,12 @@ export function BoardProvider({
   return <BoardContext value={api}>{children}</BoardContext>;
 }
 
-// Picks up other people's changes: polls a tiny version endpoint while the tab
-// is visible, and checks again whenever the tab regains focus.
+// Picks up other people's changes by polling a tiny version endpoint.
+// - every 2 minutes while the tab is visible and the person is active
+// - paused after 5 idle minutes (so a board left open overnight doesn't keep
+//   the server and database awake), resuming with an immediate check on the
+//   next mouse move, key press or touch
+// - an immediate check when the tab regains focus or becomes visible
 function useBoardSync(boardId: string, version: string) {
   const router = useRouter();
   const versionRef = useRef(version);
@@ -227,8 +235,13 @@ function useBoardSync(boardId: string, version: string) {
 
   useEffect(() => {
     let stopped = false;
+    let lastActivity = Date.now();
+    let lastCheck = Date.now(); // the page was just rendered with fresh data
+    let wasIdle = false;
+
     async function check() {
-      if (document.visibilityState !== "visible") return;
+      if (stopped || document.visibilityState !== "visible") return;
+      lastCheck = Date.now();
       try {
         const res = await fetch(`/api/boards/${boardId}/version`, { cache: "no-store" });
         if (!res.ok) return;
@@ -236,14 +249,39 @@ function useBoardSync(boardId: string, version: string) {
         if (!stopped && latest !== versionRef.current) router.refresh();
       } catch {}
     }
-    const timer = setInterval(check, SYNC_INTERVAL_MS);
-    const onVisible = () => document.visibilityState === "visible" && check();
-    window.addEventListener("focus", check);
+    const checkSoon = () => {
+      if (Date.now() - lastCheck >= MIN_GAP_MS) check();
+    };
+
+    const tick = () => {
+      const idle = Date.now() - lastActivity > IDLE_AFTER_MS;
+      wasIdle = idle;
+      if (!idle) check();
+    };
+    const onActivity = () => {
+      lastActivity = Date.now();
+      if (wasIdle) {
+        wasIdle = false;
+        checkSoon(); // back from idle: catch up right away
+      }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        lastActivity = Date.now();
+        checkSoon();
+      }
+    };
+
+    const timer = setInterval(tick, SYNC_INTERVAL_MS);
+    const activityEvents = ["pointermove", "pointerdown", "keydown", "wheel", "touchstart"] as const;
+    activityEvents.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
+    window.addEventListener("focus", onVisible);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       stopped = true;
       clearInterval(timer);
-      window.removeEventListener("focus", check);
+      activityEvents.forEach((e) => window.removeEventListener(e, onActivity));
+      window.removeEventListener("focus", onVisible);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [boardId, router]);
