@@ -55,6 +55,7 @@ async function SignInForm({ searchParams }: Pick<PageProps<"/signin">, "searchPa
       {error && (
         <p role="alert" className="mt-4 rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
           {ERRORS[error] ?? "Sign-in failed. Please try again."}
+          {!ERRORS[error] && <span className="mt-1 block text-xs opacity-75">Error code: {error}</span>}
         </p>
       )}
       <form action={signInWithGoogle}>
