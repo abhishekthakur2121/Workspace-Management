@@ -4,6 +4,7 @@ import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { Role } from "@/generated/prisma/client";
 import { db } from "@/server/db";
+import { isOwner } from "@/server/owners";
 
 declare module "next-auth" {
   interface Session {
@@ -15,12 +16,6 @@ declare module "next-auth" {
   }
 }
 
-// Emails that become admins on first sign-in, so the first admin can get in
-// before anyone has used the admin page.
-const initialAdmins = (process.env.INITIAL_ADMIN_EMAILS ?? "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   // The adapter is typed against @prisma/client; our client is generated to a
@@ -52,7 +47,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const existing = await db.user.findUnique({ where: { email } });
       if (existing) return existing.active;
 
-      if (initialAdmins.includes(email)) {
+      // Owners (INITIAL_ADMIN_EMAILS) get in before anyone has used the admin page.
+      if (isOwner(email)) {
         await db.user.create({
           data: { email, name: user.name, image: user.image, role: "admin" },
         });
