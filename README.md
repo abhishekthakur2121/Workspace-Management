@@ -76,6 +76,7 @@ Create a `.env` file in the project root. It is gitignored, so never commit it.
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | Google OAuth client credentials |
 | `AUTH_TRUST_HOST` | `true` |
 | `INITIAL_ADMIN_EMAILS` | Comma-separated emails that become admins on their first sign-in |
+| `AUTH_URL` | **Netlify only:** the site's public URL, e.g. `https://your-site.netlify.app` (no trailing slash). Without it, sign-in redirects to Netlify's per-deploy hostname and fails. Don't set it locally. |
 
 If you use the [Neon CLI](https://neon.com/docs/cli), `neon env pull` writes both database URLs for you.
 
@@ -140,10 +141,16 @@ src/
 
 ## Deployment (Netlify + Neon)
 
-1. Import this repository in Netlify. It detects Next.js automatically: build command `npm run build`.
-2. Add every variable from the table above under **Project configuration → Environment variables**.
-3. Add the Netlify URL, and later your custom domain, as redirect URIs on the Google OAuth client.
-4. Keep the Neon database in **AWS US East 2 (Ohio)**, the same region as Netlify's default functions region.
+1. Import this repository in Netlify. Build settings come from `netlify.toml`: migrations run first (`prisma migrate deploy`), then `npm run build`, published from `.next` with the Next.js runtime plugin. Leave **Base directory** empty.
+2. Add every variable from the table above under **Project configuration → Environment variables**, including `AUTH_URL` (Production context). Mark URLs and secrets as secret.
+3. In Google Cloud, add `https://<your-site>/api/auth/callback/google` as an authorised redirect URI. Set the OAuth consent screen to **Internal** (Google Workspace) or **publish** it (Gmail accounts); in "Testing" mode only listed test users can sign in.
+4. Keep the Neon database in **AWS US East 2 (Ohio)**, the same region as Netlify's default functions region. The database must sit next to the server, not next to the users.
+5. After the first deploy, check `https://<your-site>/api/health` returns `{"ok":true,"db":"up",...}`, then sign in with an `INITIAL_ADMIN_EMAILS` account and add the team under **Users**.
+
+### Housekeeping
+
+- Deleted workspaces, boards, groups, tasks and comments can be undone right away and stay in the database for 30 days. A daily Netlify scheduled function (`netlify/functions/purge-deleted.mts`) then removes them permanently, along with expired sign-in sessions. Its runs are listed under **Logs → Functions** in Netlify.
+- People are never deleted: removing someone deactivates them and signs them out, and their past work stays visible.
 
 ## Roadmap
 
@@ -154,4 +161,4 @@ src/
 - [x] Phase 4: Kanban view
 - [x] Phase 5: My work and Home
 - [x] Phase 6: comments and change history
-- [ ] Phase 7: admin user management, deploy
+- [x] Phase 7: admin user management, deploy

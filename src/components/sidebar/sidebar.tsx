@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Check, ChevronDown, Home, ListChecks, LogOut, Menu as MenuIcon, Monitor, Moon, Plus, Star, Sun, X } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Check, ChevronDown, Home, ListChecks, LogOut, Menu as MenuIcon, Monitor, Moon, Plus, Shield, Star, Sun, X } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { CreateBoardDialog } from "@/components/create-buttons";
@@ -13,7 +13,7 @@ import { signOutAction } from "@/server/actions/auth";
 import type { NavData } from "@/server/queries/nav";
 import { cn } from "@/lib/utils";
 import { usePersistentState } from "@/lib/use-persistent-state";
-import { THEME_KEY, applyTheme, type Theme } from "@/lib/theme";
+import { DEFAULT_THEME, THEME_KEY, applyTheme, type Theme } from "@/lib/theme";
 
 type User = { name?: string | null; email?: string | null; image?: string | null; role: "admin" | "member" };
 
@@ -62,6 +62,7 @@ export function AppShell({ user, nav, children }: { user: User; nav: NavData; ch
 
 function Sidebar({ user, nav, onClose }: { user: User; nav: NavData; onClose: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
   const allBoards = nav.workspaces.flatMap((w) => w.boards);
 
   const activeBoardId = pathname.match(/^\/b\/([^/]+)/)?.[1];
@@ -100,6 +101,9 @@ function Sidebar({ user, nav, onClose }: { user: User; nav: NavData; onClose: ()
       <nav className="space-y-0.5 px-2">
         <NavItem href="/" icon={<Home />} label="Home" active={pathname === "/"} />
         <NavItem href="/my-work" icon={<ListChecks />} label="My work" active={pathname === "/my-work"} />
+        {user.role === "admin" && (
+          <NavItem href="/admin/users" icon={<Shield />} label="Users" active={pathname.startsWith("/admin")} />
+        )}
       </nav>
 
       <div className="mx-4 my-3 h-px bg-border" />
@@ -163,6 +167,11 @@ function Sidebar({ user, nav, onClose }: { user: User; nav: NavData; onClose: ()
           </MenuTrigger>
           <MenuContent side="top" className="w-56">
             <MenuLabel>{user.email}</MenuLabel>
+            {user.role === "admin" && (
+              <MenuItem icon={<Shield />} onSelect={() => router.push("/admin/users")}>
+                Manage users
+              </MenuItem>
+            )}
             <MenuSeparator />
             <ThemeItems />
             <MenuSeparator />
@@ -200,7 +209,7 @@ const THEMES: { value: Theme; label: string; icon: React.ReactNode }[] = [
 ];
 
 function ThemeItems() {
-  const [theme, setTheme] = usePersistentState<Theme>(THEME_KEY, "system");
+  const [theme, setTheme] = usePersistentState<Theme>(THEME_KEY, DEFAULT_THEME);
   useEffect(() => applyTheme(theme), [theme]);
   const choose = (t: Theme) => {
     applyTheme(t, { animate: true });

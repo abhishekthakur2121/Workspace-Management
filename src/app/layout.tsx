@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Figtree } from "next/font/google";
 import "./globals.css";
-import { themeBootScript } from "@/lib/theme";
+import { DEFAULT_THEME, themeBootScript } from "@/lib/theme";
 
 const figtree = Figtree({
   variable: "--font-figtree",
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     // suppressHydrationWarning: the boot script may set data-theme before React hydrates.
-    <html lang="en" className={`${figtree.variable} h-full antialiased`} suppressHydrationWarning>
+    <html lang="en" data-theme={DEFAULT_THEME} className={`${figtree.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>

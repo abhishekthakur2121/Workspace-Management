@@ -15,3 +15,7 @@
 # flags every occurrence of the word "production" and fails the build.
 [build.environment]
   SECRETS_SCAN_OMIT_KEYS = "NEON_BRANCH"
+
+# Scheduled functions (e.g. the daily purge of items deleted 30+ days ago).
+[functions]
+  directory = "netlify/functions"
