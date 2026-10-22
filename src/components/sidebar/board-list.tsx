@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   DndContext,
@@ -18,7 +18,7 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { restrictToVerticalAxis } from "@/lib/dnd";
+import { ownEventsOnly, restrictToVerticalAxis } from "@/lib/dnd";
 import { CSS } from "@dnd-kit/utilities";
 import { LayoutGrid, MoreHorizontal } from "lucide-react";
 import { BoardMenu } from "@/components/board-menu";
@@ -43,6 +43,8 @@ export function BoardList({
     setItems(boards);
   }
   const [, startTransition] = useTransition();
+  // Stable id so dnd-kit's generated aria attributes match between server and client.
+  const dndId = useId();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -65,7 +67,7 @@ export function BoardList({
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis]} onDragEnd={onDragEnd}>
+    <DndContext id={dndId} sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis]} onDragEnd={onDragEnd}>
       <SortableContext items={items.map((b) => b.id)} strategy={verticalListSortingStrategy}>
         <ul className="space-y-0.5">
           {items.map((board) => (
@@ -79,21 +81,6 @@ export function BoardList({
         </ul>
       </SortableContext>
     </DndContext>
-  );
-}
-
-// The row's menu and dialogs render in portals, but React still bubbles their
-// events through this row. Without this filter, Space typed in a dialog would
-// start a keyboard drag (and be swallowed), and clicks could start a drag.
-function ownEventsOnly(listeners: ReturnType<typeof useSortable>["listeners"]) {
-  if (!listeners) return {};
-  return Object.fromEntries(
-    Object.entries(listeners).map(([name, handler]) => [
-      name,
-      (e: React.SyntheticEvent) => {
-        if (e.currentTarget.contains(e.target as Node)) (handler as (e: React.SyntheticEvent) => void)(e);
-      },
-    ]),
   );
 }
 
@@ -119,8 +106,9 @@ export function BoardLink({ board, active, isFavorite }: { board: NavBoard; acti
   return (
     <div
       className={cn(
-        "group flex items-center rounded-md text-sm",
-        active ? "bg-selected text-primary" : "hover:bg-hover",
+        "group relative flex items-center rounded-md text-sm transition-colors duration-150",
+        "before:absolute before:top-1.5 before:bottom-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-primary before:transition-transform before:duration-200",
+        active ? "bg-selected font-medium text-primary before:scale-y-100" : "before:scale-y-0 hover:bg-hover",
       )}
     >
       <Link href={`/b/${board.id}`} className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5" draggable={false}>

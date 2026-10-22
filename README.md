@@ -108,15 +108,34 @@ Check the database connection at http://localhost:3000/api/health. A healthy app
 
 ```
 prisma/
-  schema.prisma        database schema
-prisma.config.ts       Prisma CLI config (uses the direct connection)
-neon.ts                Neon project / branch policy
+  schema.prisma          database schema
+prisma.config.ts         Prisma CLI config (uses the direct connection)
 src/
-  app/                 routes (App Router)
-    api/health/        database health check
+  auth.ts                Auth.js: Google sign-in + allowlist
+  proxy.ts               redirects signed-out visitors to /signin
+  app/
+    (app)/               signed-in pages: Home, My work, workspace, board
+    signin/              sign-in page
+    api/                 Auth.js, health check, board sync version
+  components/
+    ui/                  shared primitives (button, menu, popover, dialog, label pill, ...)
+    sidebar/             sidebar, workspace switcher, board list
+    board/
+      board-context.tsx  board state, optimistic saves, live sync
+      filtering.ts       search / filter / sort / group-by (pure functions)
+      table/             Table view (sections, rows, group header, add rows)
+      kanban.tsx         Kanban view
+      pickers/           status, priority, people, date and tag pickers
+      task-panel/        task side panel: fields, Updates, Activity
+    my-work/             My work list and Home's "Due soon"
+  lib/                   dates, theme, text, time and other helpers
   server/
-    db.ts              Prisma client on the pooled Neon connection
-  generated/prisma/    generated Prisma client (gitignored)
+    db.ts                Prisma client on the pooled Neon connection
+    auth-guard.ts        requireUser() / requireAdmin()
+    actions/             server actions (one file per area)
+    tasks/               task-action helpers: validation, ordering, change log
+    queries/             data loading for pages
+  generated/prisma/      generated Prisma client (gitignored)
 ```
 
 ## Deployment (Netlify + Neon)
@@ -131,8 +150,8 @@ src/
 - [x] Phase 0: project setup, Neon database, Prisma connection
 - [x] Phase 1: database schema, Google sign-in with the allowlist
 - [x] Phase 2: workspaces and boards (sidebar)
-- [ ] Phase 3: Table view with groups and tasks
-- [ ] Phase 4: Kanban view
-- [ ] Phase 5: My work and Home
-- [ ] Phase 6: comments and change history
+- [x] Phase 3: Table view with groups and tasks
+- [x] Phase 4: Kanban view
+- [x] Phase 5: My work and Home
+- [x] Phase 6: comments and change history
 - [ ] Phase 7: admin user management, deploy

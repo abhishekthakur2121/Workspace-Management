@@ -2,20 +2,28 @@ import Link from "next/link";
 import { Clock, LayoutGrid, Plus } from "lucide-react";
 import { requireUser } from "@/server/auth-guard";
 import { getNavData, getRecentBoards } from "@/server/queries/nav";
+import { getMyWork } from "@/server/queries/my-work";
+import { DueSoon } from "@/components/my-work/due-soon";
 import { PageHeader } from "@/components/page-header";
-import { WorkspaceIcon } from "@/components/ui/avatar";
+import { Avatar, WorkspaceIcon } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { CreateWorkspaceButton } from "@/components/create-buttons";
 
 export default async function HomePage() {
   const user = await requireUser();
-  const [recent, nav] = await Promise.all([getRecentBoards(user.id), getNavData(user.id)]);
+  const [recent, nav, myWork] = await Promise.all([getRecentBoards(user.id), getNavData(user.id), getMyWork(user.id)]);
   const firstName = user.name?.split(" ")[0] ?? "there";
 
   return (
     <>
-      <PageHeader title={`Hi ${firstName} 👋`} subtitle="Pick up where you left off." />
+      <PageHeader
+        icon={<Avatar name={user.name ?? user.email ?? "?"} image={user.image} className="size-11 text-sm ring-2 ring-primary/20 ring-offset-2 ring-offset-surface" />}
+        title={`Welcome back, ${firstName}`}
+        subtitle="Pick up where you left off."
+      />
       <div className="space-y-8 p-6">
+        <DueSoon tasks={myWork} />
+
         <section>
           <h2 className="mb-3 flex items-center gap-2 font-semibold">
             <Clock className="size-4 text-muted" /> Recently visited
@@ -26,7 +34,7 @@ export default async function HomePage() {
                 <Link
                   key={b.id}
                   href={`/b/${b.id}`}
-                  className="rounded-lg border border-border bg-surface p-4 transition hover:shadow-md"
+                  className="card-shadow rounded-xl border border-grid bg-surface p-4 transition hover:-translate-y-px hover:shadow-md"
                 >
                   <div className="flex items-center gap-2">
                     <LayoutGrid className="size-4 text-muted" />
@@ -59,7 +67,7 @@ export default async function HomePage() {
                 <Link
                   key={w.id}
                   href={`/w/${w.id}`}
-                  className="flex items-center gap-3 rounded-lg border border-border bg-surface p-4 transition hover:shadow-md"
+                  className="flex items-center gap-3 card-shadow rounded-xl border border-grid bg-surface p-4 transition hover:-translate-y-px hover:shadow-md"
                 >
                   <WorkspaceIcon name={w.name} color={w.color} className="size-10 text-base" />
                   <div className="min-w-0">
@@ -72,7 +80,7 @@ export default async function HomePage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-lg border border-dashed border-border bg-surface p-8 text-center">
+            <div className="rounded-xl border border-dashed border-border bg-surface p-8 text-center">
               <p className="font-medium">No workspaces yet</p>
               <p className="mt-1 text-sm text-muted">Create one for each client or team to get started.</p>
               <CreateWorkspaceButton>

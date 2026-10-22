@@ -13,7 +13,7 @@ export function MenuContent({ className, align = "start", ...props }: DropdownMe
         align={align}
         sideOffset={4}
         className={cn(
-          "z-50 min-w-48 rounded-lg border border-border bg-surface p-1.5 text-sm shadow-lg",
+          "anim-pop z-50 min-w-48 rounded-xl border border-grid bg-surface p-1.5 text-sm shadow-xl shadow-black/5",
           className,
         )}
         {...props}
@@ -32,7 +32,7 @@ export function MenuItem({
   return (
     <DropdownMenu.Item
       className={cn(
-        "flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 outline-none select-none",
+        "flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 outline-none transition-colors duration-100 select-none",
         "data-highlighted:bg-hover data-disabled:pointer-events-none data-disabled:opacity-50",
         danger && "text-danger",
         className,

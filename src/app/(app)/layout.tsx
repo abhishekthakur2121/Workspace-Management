@@ -12,7 +12,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Suspense fallback={<ShellSkeleton />}>
         <AuthGate>{children}</AuthGate>
       </Suspense>
-      <Toaster position="bottom-center" richColors closeButton />
+      <Toaster
+        position="bottom-center"
+        closeButton
+        toastOptions={{
+          classNames: {
+            toast: "!rounded-xl !border-grid !bg-surface !text-foreground !shadow-xl",
+            actionButton: "!bg-primary !text-white !rounded-md",
+            closeButton: "!bg-surface !border-grid !text-muted",
+          },
+        }}
+      />
     </>
   );
 }

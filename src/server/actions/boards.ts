@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { requireUser } from "@/server/auth-guard";
-import { positionAfter, positionBetween } from "@/server/positions";
+import { positionAfter, positionBetween, positionsFromStart } from "@/server/positions";
 
 const id = z.string().min(1);
 const name = z.string().trim().min(1, "Name is required").max(80);
@@ -21,12 +21,6 @@ const DEFAULT_GROUPS = [
   { name: "Backlog", color: "#a25ddc" },
 ];
 
-function sequence(n: number) {
-  const keys: string[] = [];
-  for (let i = 0; i < n; i++) keys.push(positionAfter(keys[i - 1]));
-  return keys;
-}
-
 export async function createBoard(input: { workspaceId: string; name: string }) {
   await requireUser();
   const data = z.object({ workspaceId: id, name }).parse(input);
@@ -36,8 +30,8 @@ export async function createBoard(input: { workspaceId: string; name: string }) 
     orderBy: { position: "desc" },
     select: { position: true },
   });
-  const statusKeys = sequence(DEFAULT_STATUSES.length);
-  const groupKeys = sequence(DEFAULT_GROUPS.length);
+  const statusKeys = positionsFromStart(DEFAULT_STATUSES.length);
+  const groupKeys = positionsFromStart(DEFAULT_GROUPS.length);
 
   const board = await db.board.create({
     data: {

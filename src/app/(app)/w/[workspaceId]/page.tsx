@@ -52,7 +52,7 @@ export default async function WorkspacePage({ params }: PageProps<"/w/[workspace
         {workspace.boards.length ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {workspace.boards.map((b) => (
-              <div key={b.id} className="group relative rounded-lg border border-border bg-surface transition hover:shadow-md">
+              <div key={b.id} className="card-shadow group relative rounded-xl border border-grid bg-surface transition hover:-translate-y-px hover:shadow-md">
                 <Link href={`/b/${b.id}`} className="flex items-center gap-2 p-4 pr-10">
                   <LayoutGrid className="size-4 text-muted" />
                   <span className="truncate font-medium">{b.name}</span>
@@ -71,7 +71,7 @@ export default async function WorkspacePage({ params }: PageProps<"/w/[workspace
             ))}
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-border bg-surface p-8 text-center">
+          <div className="rounded-xl border border-dashed border-border bg-surface p-8 text-center">
             <p className="font-medium">No boards in {workspace.name} yet</p>
             <p className="mt-1 mb-4 text-sm text-muted">A board holds one stream of work, like &quot;Digital Operations&quot;.</p>
             {newBoard}

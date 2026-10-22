@@ -1,17 +1,64 @@
 @import "tailwindcss";
 
-/* monday-style palette; extended into full design tokens in Phase 2 */
+/* monday-style palette. Light is the default; dark follows the OS setting
+   unless the user picked a theme (data-theme on <html>). */
 :root {
+  color-scheme: light;
   --background: #f6f7fb;
   --surface: #ffffff;
   --foreground: #323338;
   --muted: #676879;
   --border: #d0d4e4;
-  --hover: #dcdfec;
+  --hover: #eceef5;
+  --grid: #e6e9ef;
+  --label-empty: #eef0f5;
   --selected: #cce5ff;
   --primary: #0073ea;
   --primary-hover: #0060b9;
   --danger: #e2445c;
+  --shadow: 16 24 40;
+  --neon-ink: #000;
+  --neon-tint: 14%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --background: #181b34;
+    --surface: #222644;
+    --foreground: #d5d8df;
+    --muted: #9699a6;
+    --border: #4b4e69;
+    --hover: #30355a;
+    --grid: #363a5c;
+    --label-empty: #2d3152;
+    --selected: #1d3a6e;
+    --primary: #2f8cff;
+    --primary-hover: #579bfc;
+    --danger: #f2667a;
+    --shadow: 0 0 0;
+    --neon-ink: #fff;
+    --neon-tint: 22%;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #181b34;
+  --surface: #222644;
+  --foreground: #d5d8df;
+  --muted: #9699a6;
+  --border: #4b4e69;
+  --hover: #30355a;
+  --grid: #363a5c;
+  --label-empty: #2d3152;
+  --selected: #1d3a6e;
+  --primary: #2f8cff;
+  --primary-hover: #579bfc;
+  --danger: #f2667a;
+  --shadow: 0 0 0;
+  --neon-ink: #fff;
+  --neon-tint: 22%;
 }
 
 @theme inline {
@@ -21,6 +68,8 @@
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-hover: var(--hover);
+  --color-grid: var(--grid);
+  --color-label-empty: var(--label-empty);
   --color-selected: var(--selected);
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
@@ -32,4 +81,197 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+/* Soft card shadow that adapts to the theme. In the components layer so
+   Tailwind's hover:shadow-* utilities can still override it. */
+@layer components {
+  .card-shadow {
+    box-shadow:
+      0 1px 2px rgb(var(--shadow) / 0.04),
+      0 1px 3px rgb(var(--shadow) / 0.06);
+  }
+}
+
+/* ─── Motion ──────────────────────────────────────────────────────────────
+   Short, soft and purposeful. Everything is disabled for people who ask
+   their OS for reduced motion. */
+
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.96) translateY(-2px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pop-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: scale(0.97); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+/* Tailwind v4 centres with the separate `translate` property, so these only
+   scale and nudge via `transform`, which composes with it. */
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes dialog-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(4px) scale(0.98); }
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(-4px); background-color: var(--selected); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes sheet-in {
+  from { transform: translateX(100%); }
+  to { transform: none; }
+}
+@keyframes sheet-out {
+  from { transform: none; }
+  to { transform: translateX(100%); }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+
+/* Menus, popovers, pickers: grow from where they were opened. */
+.anim-pop[data-state="open"] {
+  animation: pop-in 160ms var(--ease-out);
+}
+.anim-pop[data-state="closed"] {
+  animation: pop-out 100ms var(--ease-in);
+  /* A closing menu must not react to the pointer: Radix menus focus
+     themselves on pointer move, which would steal focus from a field the
+     menu just opened (e.g. "Rename group"). */
+  pointer-events: none;
+}
+.anim-pop {
+  transform-origin: var(--radix-popover-content-transform-origin, var(--radix-dropdown-menu-content-transform-origin, top));
+}
+
+.anim-overlay[data-state="open"] {
+  animation: fade-in 180ms var(--ease-out);
+}
+.anim-overlay[data-state="closed"] {
+  animation: fade-out 120ms var(--ease-in);
+}
+.anim-dialog[data-state="open"] {
+  animation: dialog-in 220ms var(--ease-out);
+}
+.anim-dialog[data-state="closed"] {
+  animation: dialog-out 120ms var(--ease-in);
+}
+
+/* Task panel slides in from the right edge. */
+.anim-sheet[data-state="open"] {
+  animation: sheet-in 300ms var(--ease-out);
+}
+.anim-sheet[data-state="closed"] {
+  animation: sheet-out 180ms var(--ease-in);
+}
+
+/* Page content rises in on navigation (see app/(app)/template.tsx). */
+.anim-page {
+  animation: rise-in 260ms var(--ease-out);
+}
+/* Newly added rows and cards. */
+.anim-row {
+  animation: row-in 420ms var(--ease-out);
+}
+.anim-bulk {
+  animation: slide-up 240ms var(--ease-out);
+}
+
+/* Smooth expand/collapse without measuring heights. */
+.collapsible {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 240ms var(--ease-out), opacity 200ms var(--ease-out);
+}
+.collapsible[data-open="false"] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.collapsible > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--hover) 25%, var(--label-empty) 50%, var(--hover) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* Crossfade colours while the theme switches (class added briefly by JS). */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition:
+    background-color 240ms ease,
+    border-color 240ms ease,
+    color 240ms ease,
+    fill 240ms ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* ─── Neon label pills (status, priority) ───────────────────────────────────
+   Set --c to the label colour. Tinted fill, deeper border and text in the
+   same hue, and a soft glow of the colour itself. */
+@layer components {
+  .neon-pill {
+    --c: #c4c4c4;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    border: 1.5px solid color-mix(in srgb, var(--c) 78%, var(--neon-ink));
+    background: color-mix(in srgb, var(--c) var(--neon-tint), var(--surface));
+    color: color-mix(in srgb, var(--c) 58%, var(--neon-ink));
+    font-weight: 600;
+    box-shadow:
+      0 0 12px -2px color-mix(in srgb, var(--c) 80%, transparent),
+      inset 0 0 8px -2px color-mix(in srgb, var(--c) 50%, transparent);
+    transition:
+      background-color 300ms ease,
+      border-color 300ms ease,
+      color 300ms ease,
+      box-shadow 200ms ease;
+  }
+  .neon-pill.neon-interactive:hover,
+  :is(button, a):hover > .neon-pill,
+  .group\/cell:hover .neon-pill {
+    box-shadow:
+      0 0 16px -2px color-mix(in srgb, var(--c) 85%, transparent),
+      inset 0 0 10px -2px color-mix(in srgb, var(--c) 55%, transparent);
+  }
 }

@@ -8,7 +8,9 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function createClient() {
   const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! });
-  return new PrismaClient({ adapter });
+  // Generous limits for any interactive transaction: each statement is a
+  // network round trip, which is slow from a laptop far from the database.
+  return new PrismaClient({ adapter, transactionOptions: { maxWait: 10_000, timeout: 15_000 } });
 }
 
 export const db = globalForPrisma.prisma ?? createClient();

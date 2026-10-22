@@ -34,7 +34,7 @@ export function WorkspaceSwitcher({
         }}
       >
         <Popover.Trigger asChild>
-          <button className="flex w-full items-center gap-2 rounded-md border border-border px-2 py-1.5 text-left text-sm hover:bg-hover">
+          <button className="flex w-full items-center gap-2 rounded-lg border border-grid px-2 py-1.5 text-left text-sm transition-all duration-150 hover:border-border hover:bg-hover active:scale-[0.99] data-[state=open]:border-primary data-[state=open]:ring-2 data-[state=open]:ring-primary/15">
             {current ? (
               <>
                 <WorkspaceIcon name={current.name} color={current.color} />
@@ -50,7 +50,7 @@ export function WorkspaceSwitcher({
           <Popover.Content
             align="start"
             sideOffset={4}
-            className="z-50 w-(--radix-popover-trigger-width) min-w-64 rounded-lg border border-border bg-surface p-1.5 shadow-lg"
+            className="anim-pop z-50 w-(--radix-popover-trigger-width) min-w-64 rounded-xl border border-grid bg-surface p-1.5 shadow-xl shadow-black/5"
           >
             <div className="mb-1 flex items-center gap-2 rounded-md border border-border px-2">
               <Search className="size-4 text-muted" />

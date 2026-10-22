@@ -12,7 +12,9 @@ export const requireUser = cache(async () => {
   // Session and data reads use random values (session lookup, DB driver), so
   // they must run at request time, never during a prerender.
   await connection();
-  const session = await auth();
+  // A failed session lookup (e.g. a dropped database connection) looks the
+  // same as "signed out"; retry once so a blip doesn't bounce people to sign-in.
+  const session = (await auth()) ?? (await auth());
   if (!session?.user?.id || !session.user.active) redirect("/signin");
   return session.user;
 });

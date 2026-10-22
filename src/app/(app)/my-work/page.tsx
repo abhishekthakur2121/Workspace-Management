@@ -1,13 +1,19 @@
 import type { Metadata } from "next";
+import { requireUser } from "@/server/auth-guard";
+import { getMyWork } from "@/server/queries/my-work";
 import { PageHeader } from "@/components/page-header";
+import { MyWorkList } from "@/components/my-work/my-work-list";
 
 export const metadata: Metadata = { title: "My work" };
 
-export default function MyWorkPage() {
+export default async function MyWorkPage() {
+  const user = await requireUser();
+  const tasks = await getMyWork(user.id);
+
   return (
     <>
-      <PageHeader title="My work" subtitle="Every task assigned to you, across all workspaces." />
-      <div className="p-6 text-sm text-muted">Your tasks will appear here once boards have tasks.</div>
+      <PageHeader title="My work" subtitle="Every task you're accountable or responsible for, across all workspaces." />
+      <MyWorkList tasks={tasks} />
     </>
   );
 }

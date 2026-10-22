@@ -1,3 +1,4 @@
+import { inspect } from "node:util";
 import NextAuth, { type DefaultSession } from "next-auth";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -36,6 +37,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   pages: { signIn: "/signin", error: "/signin" },
+  logger: {
+    // Auth.js hides the underlying error by default; log it in full.
+    error(error) {
+      console.error("[auth]", inspect(error, { depth: 6 }));
+    },
+  },
   callbacks: {
     // The allowlist: only an existing, active User row (or an initial admin) gets in.
     async signIn({ user, profile }) {

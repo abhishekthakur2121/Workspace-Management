@@ -19,11 +19,11 @@ export function DialogContent({
 }) {
   return (
     <D.Portal>
-      <D.Overlay className="fixed inset-0 z-50 bg-black/40" />
+      <D.Overlay className="anim-overlay fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]" />
       <D.Content
         className={cn(
           "fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2",
-          "rounded-xl bg-surface p-6 shadow-xl focus:outline-none",
+          "anim-dialog rounded-2xl border border-grid bg-surface p-6 shadow-2xl focus:outline-none",
           className,
         )}
       >

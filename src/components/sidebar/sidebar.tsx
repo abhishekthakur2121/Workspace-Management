@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, Home, ListChecks, LogOut, Menu as MenuIcon, Plus, Star, X } from "lucide-react";
+import { Check, ChevronDown, Home, ListChecks, LogOut, Menu as MenuIcon, Monitor, Moon, Plus, Star, Sun, X } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { CreateBoardDialog } from "@/components/create-buttons";
@@ -12,6 +12,8 @@ import { WorkspaceSwitcher } from "./workspace-switcher";
 import { signOutAction } from "@/server/actions/auth";
 import type { NavData } from "@/server/queries/nav";
 import { cn } from "@/lib/utils";
+import { usePersistentState } from "@/lib/use-persistent-state";
+import { THEME_KEY, applyTheme, type Theme } from "@/lib/theme";
 
 type User = { name?: string | null; email?: string | null; image?: string | null; role: "admin" | "member" };
 
@@ -86,8 +88,8 @@ function Sidebar({ user, nav, onClose }: { user: User; nav: NavData; onClose: ()
   return (
     <>
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="grid size-7 place-items-center rounded-lg bg-primary text-sm font-bold text-white">W</span>
+        <Link href="/" className="group/logo flex items-center gap-2">
+          <span className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-[#2f8cff] to-[#6c4cf5] text-sm font-bold text-white shadow-sm shadow-primary/30 transition-transform duration-200 group-hover/logo:rotate-[-6deg]">W</span>
           <span className="font-semibold">WorkManager</span>
         </Link>
         <button aria-label="Close menu" onClick={onClose} className="rounded p-1 hover:bg-hover md:hidden">
@@ -111,7 +113,7 @@ function Sidebar({ user, nav, onClose }: { user: User; nav: NavData; onClose: ()
           <span className="flex-1 text-left">Favorites</span>
           <ChevronDown className={cn("size-4 text-muted transition-transform", !favoritesOpen && "-rotate-90")} />
         </button>
-        {favoritesOpen && (
+        <div className="collapsible" data-open={favoritesOpen} inert={!favoritesOpen}>
           <ul className="mt-0.5 space-y-0.5 pl-3">
             {favorites.map((b) => (
               <li key={b.id}>
@@ -122,7 +124,7 @@ function Sidebar({ user, nav, onClose }: { user: User; nav: NavData; onClose: ()
               <li className="px-3 py-1 text-xs text-muted">Star a board to pin it here</li>
             )}
           </ul>
-        )}
+        </div>
 
         <div className="mx-2 my-3 h-px bg-border" />
 
@@ -162,6 +164,8 @@ function Sidebar({ user, nav, onClose }: { user: User; nav: NavData; onClose: ()
           <MenuContent side="top" className="w-56">
             <MenuLabel>{user.email}</MenuLabel>
             <MenuSeparator />
+            <ThemeItems />
+            <MenuSeparator />
             <MenuItem icon={<LogOut />} onSelect={() => signOutAction()}>
               Sign out
             </MenuItem>
@@ -177,12 +181,43 @@ function NavItem({ href, icon, label, active }: { href: string; icon: React.Reac
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm [&>svg]:size-4",
-        active ? "bg-selected text-primary [&>svg]:text-primary" : "hover:bg-hover [&>svg]:text-muted",
+        // Active marker: a small bar that grows in from the left edge.
+        "relative flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors duration-150 [&>svg]:size-4",
+        "before:absolute before:top-1.5 before:bottom-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-primary before:transition-transform before:duration-200",
+        active ? "bg-selected font-medium text-primary before:scale-y-100 [&>svg]:text-primary" : "before:scale-y-0 hover:bg-hover [&>svg]:text-muted",
       )}
     >
       {icon}
       {label}
     </Link>
+  );
+}
+
+const THEMES: { value: Theme; label: string; icon: React.ReactNode }[] = [
+  { value: "light", label: "Light", icon: <Sun /> },
+  { value: "dark", label: "Dark", icon: <Moon /> },
+  { value: "system", label: "Match system", icon: <Monitor /> },
+];
+
+function ThemeItems() {
+  const [theme, setTheme] = usePersistentState<Theme>(THEME_KEY, "system");
+  useEffect(() => applyTheme(theme), [theme]);
+  const choose = (t: Theme) => {
+    applyTheme(t, { animate: true });
+    setTheme(t);
+  };
+  return (
+    <>
+      <MenuLabel>Theme</MenuLabel>
+      {THEMES.map((t) => (
+        <MenuItem key={t.value} icon={t.icon} onSelect={(e) => {
+          e.preventDefault(); // keep the menu open so the change is visible
+          choose(t.value);
+        }}>
+          <span className="flex-1">{t.label}</span>
+          {theme === t.value && <Check className="size-4 text-primary" />}
+        </MenuItem>
+      ))}
+    </>
   );
 }

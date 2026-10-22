@@ -20,7 +20,7 @@ export function BoardHeader({ board, isFavorite }: { board: Board; isFavorite: b
   const [, startTransition] = useTransition();
 
   return (
-    <header className="border-b border-border bg-surface px-6 pt-3 pb-4">
+    <header className="bg-surface px-6 pt-4 pb-1">
       <Link
         href={`/w/${board.workspace.id}`}
         className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-foreground"
@@ -79,7 +79,7 @@ function EditableTitle({ value, onSave }: { value: string; onSave: (value: strin
             setEditing(false);
           }
         }}
-        className="-ml-1.5 min-w-0 rounded-md border border-primary px-1.5 text-2xl font-semibold outline-none"
+        className="-ml-1.5 min-w-0 rounded-md border border-primary px-1.5 text-[26px] font-bold tracking-tight outline-none ring-2 ring-primary/15"
         size={Math.max(draft.length, 8)}
       />
     );
@@ -88,7 +88,7 @@ function EditableTitle({ value, onSave }: { value: string; onSave: (value: strin
     <h1
       title="Click to rename"
       onClick={() => setEditing(true)}
-      className="-ml-1.5 cursor-text truncate rounded-md border border-transparent px-1.5 text-2xl font-semibold hover:border-border"
+      className="-ml-1.5 cursor-text truncate rounded-md border border-transparent px-1.5 text-[26px] font-bold tracking-tight hover:border-grid"
     >
       {draft}
     </h1>
