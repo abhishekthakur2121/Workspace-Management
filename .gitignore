@@ -43,3 +43,6 @@ next-env.d.ts
 
 # prisma generated client
 /src/generated
+
+# netlify local build output
+.netlify
