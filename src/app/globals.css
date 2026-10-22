@@ -7,6 +7,8 @@
   --foreground: #323338;
   --muted: #676879;
   --border: #d0d4e4;
+  --hover: #dcdfec;
+  --selected: #cce5ff;
   --primary: #0073ea;
   --primary-hover: #0060b9;
   --danger: #e2445c;
@@ -18,6 +20,8 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-border: var(--border);
+  --color-hover: var(--hover);
+  --color-selected: var(--selected);
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-danger: var(--danger);

@@ -129,8 +129,8 @@ src/
 ## Roadmap
 
 - [x] Phase 0: project setup, Neon database, Prisma connection
-- [ ] Phase 1: database schema, Google sign-in with the allowlist
-- [ ] Phase 2: workspaces and boards (sidebar)
+- [x] Phase 1: database schema, Google sign-in with the allowlist
+- [x] Phase 2: workspaces and boards (sidebar)
 - [ ] Phase 3: Table view with groups and tasks
 - [ ] Phase 4: Kanban view
 - [ ] Phase 5: My work and Home

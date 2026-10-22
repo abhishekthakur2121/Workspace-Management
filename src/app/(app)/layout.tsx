@@ -1,43 +1,38 @@
 import { Suspense } from "react";
-import { signOut } from "@/auth";
+import { Toaster } from "sonner";
 import { requireUser } from "@/server/auth-guard";
+import { getNavData } from "@/server/queries/nav";
+import { AppShell } from "@/components/sidebar/sidebar";
 
 // Every route in (app) requires a signed-in, allowlisted user. The session is
 // read from cookies, so under Cache Components it must sit inside Suspense.
-// Phase 2 replaces the top bar with the full sidebar.
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <Suspense fallback={<div className="flex-1" />}>
-      <AuthGate>{children}</AuthGate>
-    </Suspense>
+    <>
+      <Suspense fallback={<ShellSkeleton />}>
+        <AuthGate>{children}</AuthGate>
+      </Suspense>
+      <Toaster position="bottom-center" richColors closeButton />
+    </>
   );
 }
 
 async function AuthGate({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
-
-  async function signOutAction() {
-    "use server";
-    await signOut({ redirectTo: "/signin" });
-  }
+  const nav = await getNavData(user.id);
 
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between border-b border-border bg-surface px-4 py-2">
-        <span className="font-semibold">WorkManager</span>
-        <div className="flex items-center gap-3 text-sm">
-          {user.role === "admin" && (
-            <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-              Admin
-            </span>
-          )}
-          <span className="text-muted">{user.email}</span>
-          <form action={signOutAction}>
-            <button className="rounded-md px-2 py-1 hover:bg-background">Sign out</button>
-          </form>
-        </div>
-      </header>
-      <main className="flex-1 p-6">{children}</main>
+    <AppShell user={user} nav={nav}>
+      {children}
+    </AppShell>
+  );
+}
+
+function ShellSkeleton() {
+  return (
+    <div className="flex h-dvh">
+      <div className="hidden w-64 shrink-0 border-r border-border bg-surface md:block" />
+      <div className="flex-1" />
     </div>
   );
 }
