@@ -2,7 +2,8 @@
 # Publish must be .next so Netlify's Next.js runtime packages the app into
 # server functions; publishing the repo root serves the source as static files.
 [build]
-  command = "npm run build"
+  # Apply pending migrations (over DATABASE_URL_UNPOOLED) before building.
+  command = "npx prisma migrate deploy && npm run build"
   publish = ".next"
 
 # Declared explicitly: the automatic install didn't run on this site, so the

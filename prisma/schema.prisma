@@ -7,4 +7,280 @@ datasource db {
   provider = "postgresql"
 }
 
-// Models are added in Phase 1 (users/allowlist, Auth.js tables) and onward.
+// ─── Users & auth ───────────────────────────────────────────────────────────
+// A User row is the allowlist entry: admins create it with an email + role
+// before the person ever signs in. Sign-in is refused without an active row.
+
+enum Role {
+  admin
+  member
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  emailVerified DateTime?
+  role          Role      @default(member)
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+
+  accountableTasks Task[]            @relation("TaskAccountable")
+  responsibleFor   TaskResponsible[]
+  createdTasks     Task[]            @relation("TaskCreatedBy")
+  comments         Comment[]
+  activities       Activity[]
+  favorites        Favorite[]
+  boardVisits      BoardVisit[]
+}
+
+// Auth.js tables (shape required by @auth/prisma-adapter)
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+// ─── Work structure ─────────────────────────────────────────────────────────
+// `position` columns hold fractional-index strings so a reorder touches one row.
+// `deletedAt` is a soft delete (undo toast); a scheduled job purges after 30 days.
+
+model Workspace {
+  id        String    @id @default(cuid())
+  name      String
+  color     String    @default("#579bfc")
+  position  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  boards Board[]
+}
+
+model Board {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  position    String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  workspace  Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  groups     Group[]
+  statuses   StatusLabel[]
+  tags       Tag[]
+  tasks      Task[]
+  activities Activity[]
+  favorites  Favorite[]
+  visits     BoardVisit[]
+
+  @@index([workspaceId, position])
+}
+
+model Group {
+  id        String    @id @default(cuid())
+  boardId   String
+  name      String
+  color     String    @default("#579bfc")
+  position  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks Task[]
+
+  @@index([boardId, position])
+}
+
+model StatusLabel {
+  id       String  @id @default(cuid())
+  boardId  String
+  name     String
+  color    String
+  position String
+  isDone   Boolean @default(false)
+
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks Task[]
+
+  @@index([boardId, position])
+}
+
+model Tag {
+  id      String @id @default(cuid())
+  boardId String
+  name    String
+  color   String
+
+  board Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks TaskTag[]
+
+  @@unique([boardId, name])
+}
+
+enum Priority {
+  low
+  medium
+  high
+  critical
+}
+
+model Task {
+  id             String    @id @default(cuid())
+  boardId        String
+  groupId        String
+  parentId       String? // set for subtasks (one level deep)
+  name           String
+  accountableId  String?
+  statusId       String?
+  dueDate        DateTime? @db.Date
+  priority       Priority?
+  position       String // order within its group (table view)
+  kanbanPosition String // order within its status column (kanban view)
+  createdById    String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  board       Board        @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  group       Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  parent      Task?        @relation("Subtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks    Task[]       @relation("Subtasks")
+  accountable User?        @relation("TaskAccountable", fields: [accountableId], references: [id], onDelete: SetNull)
+  status      StatusLabel? @relation(fields: [statusId], references: [id], onDelete: SetNull)
+  createdBy   User         @relation("TaskCreatedBy", fields: [createdById], references: [id])
+
+  responsible TaskResponsible[]
+  tags        TaskTag[]
+  comments    Comment[]
+  activities  Activity[]
+
+  @@index([boardId, groupId, position])
+  @@index([parentId])
+  @@index([statusId])
+  @@index([accountableId, dueDate])
+}
+
+model TaskResponsible {
+  taskId String
+  userId String
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+  @@index([userId])
+}
+
+model TaskTag {
+  taskId String
+  tagId  String
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
+}
+
+// ─── Updates & history ──────────────────────────────────────────────────────
+
+model Comment {
+  id        String    @id @default(cuid())
+  taskId    String
+  authorId  String
+  body      String
+  createdAt DateTime  @default(now())
+  editedAt  DateTime?
+  deletedAt DateTime?
+
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([taskId, createdAt])
+}
+
+// One row per change, written in the same transaction as the mutation.
+model Activity {
+  id        String   @id @default(cuid())
+  taskId    String
+  boardId   String
+  actorId   String
+  action    String // created | updated | deleted | restored | moved | commented
+  field     String?
+  oldValue  Json?
+  newValue  Json?
+  createdAt DateTime @default(now())
+
+  task  Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  actor User  @relation(fields: [actorId], references: [id])
+
+  @@index([taskId, createdAt])
+}
+
+// ─── Navigation ─────────────────────────────────────────────────────────────
+
+model Favorite {
+  userId    String
+  boardId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@id([userId, boardId])
+}
+
+model BoardVisit {
+  userId    String
+  boardId   String
+  visitedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@id([userId, boardId])
+  @@index([userId, visitedAt])
+}
