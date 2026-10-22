@@ -1,0 +1,10 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Models are added in Phase 1 (users/allowlist, Auth.js tables) and onward.
