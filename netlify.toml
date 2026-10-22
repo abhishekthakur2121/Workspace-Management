@@ -5,6 +5,11 @@
   command = "npm run build"
   publish = ".next"
 
+# Declared explicitly: the automatic install didn't run on this site, so the
+# build produced no server function and every route returned 404.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
 # NEON_BRANCH holds the branch name ("production"), not a secret; scanning it
 # flags every occurrence of the word "production" and fails the build.
 [build.environment]
