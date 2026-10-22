@@ -1,0 +1,6 @@
+# Overrides the build settings in the Netlify UI.
+# Publish must be .next so Netlify's Next.js runtime packages the app into
+# server functions; publishing the repo root serves the source as static files.
+[build]
+  command = "npm run build"
+  publish = ".next"
