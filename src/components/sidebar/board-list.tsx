@@ -82,6 +82,21 @@ export function BoardList({
   );
 }
 
+// The row's menu and dialogs render in portals, but React still bubbles their
+// events through this row. Without this filter, Space typed in a dialog would
+// start a keyboard drag (and be swallowed), and clicks could start a drag.
+function ownEventsOnly(listeners: ReturnType<typeof useSortable>["listeners"]) {
+  if (!listeners) return {};
+  return Object.fromEntries(
+    Object.entries(listeners).map(([name, handler]) => [
+      name,
+      (e: React.SyntheticEvent) => {
+        if (e.currentTarget.contains(e.target as Node)) (handler as (e: React.SyntheticEvent) => void)(e);
+      },
+    ]),
+  );
+}
+
 function SortableBoard({ board, active, isFavorite }: { board: NavBoard; active: boolean; isFavorite: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: board.id });
 
@@ -91,7 +106,7 @@ function SortableBoard({ board, active, isFavorite }: { board: NavBoard; active:
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn("relative", isDragging && "z-10 opacity-80")}
       {...attributes}
-      {...listeners}
+      {...ownEventsOnly(listeners)}
       // The row holds a link and a menu button, so it must not itself be a button.
       role="listitem"
     >

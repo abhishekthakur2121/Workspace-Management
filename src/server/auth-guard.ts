@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { auth } from "@/auth";
 
 // The real access check. Every page, Server Action and data loader calls one
@@ -8,6 +9,9 @@ import { auth } from "@/auth";
 // Sessions are read from the database on each request, so a deactivated user
 // is rejected on their very next request.
 export const requireUser = cache(async () => {
+  // Session and data reads use random values (session lookup, DB driver), so
+  // they must run at request time, never during a prerender.
+  await connection();
   const session = await auth();
   if (!session?.user?.id || !session.user.active) redirect("/signin");
   return session.user;
