@@ -8,7 +8,9 @@ import { auth } from "@/auth";
 // of these; proxy.ts only does a cheap cookie check for redirects.
 // Sessions are read from the database on each request, so a deactivated user
 // is rejected on their very next request.
-export const requireUser = cache(async () => {
+// The signed-in user, before the "must change password" check. Only the
+// change-password page uses this directly.
+export const getSignedInUser = cache(async () => {
   // Session and data reads use random values (session lookup, DB driver), so
   // they must run at request time, never during a prerender.
   await connection();
@@ -17,6 +19,14 @@ export const requireUser = cache(async () => {
   const session = (await auth()) ?? (await auth());
   if (!session?.user?.id || !session.user.active) redirect("/signin");
   return session.user;
+});
+
+export const requireUser = cache(async () => {
+  const user = await getSignedInUser();
+  // Someone signed in with a temporary password can do nothing else until
+  // they set their own; this also blocks every server action.
+  if (user.mustChangePassword) redirect("/account/password");
+  return user;
 });
 
 export async function requireAdmin() {

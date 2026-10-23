@@ -7,9 +7,11 @@ A free, self-hosted work-management tool for a small agency (up to ~20 internal 
 ## Features (v1)
 
 **Sign-in and users**
-- Google sign-in for internal staff only. No passwords are stored.
-- Admins manage an allowlist of emails, each with a role (`admin` or `member`).
-- Removing a user blocks them immediately. Their past work and comments stay, shown greyed out.
+- Internal staff only; there is no public sign-up. Admins keep the team list (each person has a role: `admin` or `member`).
+- Two ways to sign in: **Google**, or **email + password** for people an admin gives a password.
+- Admins set an initial password (typed, or generated and shown once). On first sign-in the person must choose their own; forgotten passwords are reset by an admin.
+- Passwords are stored only as salted `scrypt` hashes. Five wrong attempts lock the account for 15 minutes.
+- Removing a person signs them out immediately (database sessions). Their past work and comments stay, shown greyed out.
 
 **How work is organised**
 - **Workspace:** e.g. one per client, or any grouping you like.

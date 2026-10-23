@@ -7,8 +7,20 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { requireAdmin } from "@/server/auth-guard";
+import { generatePassword, hashPassword, passwordProblem } from "@/server/passwords";
 
 type Result = { ok: true } | { error: string };
+// A temporary password is returned once so the admin can pass it on.
+type PasswordResult = { ok: true; password?: string } | { error: string };
+
+// "generate" → a random readable password; { typed } → the admin's own choice.
+type PasswordChoice = "none" | "generate" | { typed: string };
+
+async function temporaryPassword(choice: PasswordChoice) {
+  if (choice === "none") return { password: undefined, error: undefined };
+  const password = choice === "generate" ? generatePassword() : choice.typed;
+  return { password, error: passwordProblem(password) ?? undefined };
+}
 
 const id = z.string().min(1);
 const role = z.enum(["admin", "member"]);
@@ -17,22 +29,46 @@ const email = z.string().trim().toLowerCase().email("Enter a valid email address
 const otherActiveAdmins = (exceptId: string) =>
   db.user.count({ where: { role: "admin", active: true, id: { not: exceptId } } });
 
-export async function addUser(input: { email: string; role: "admin" | "member" }): Promise<Result> {
+export async function addUser(input: { email: string; role: "admin" | "member"; password: PasswordChoice }): Promise<PasswordResult> {
   await requireAdmin();
   const parsed = z.object({ email, role }).safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   const data = parsed.data;
+  const temp = await temporaryPassword(input.password);
+  if (temp.error) return { error: temp.error };
 
   const existing = await db.user.findUnique({ where: { email: data.email }, select: { id: true, active: true } });
   if (existing?.active) return { error: `${data.email} is already on the team.` };
+  // With a password, they must choose their own at first sign-in.
+  const passwordData = temp.password
+    ? { passwordHash: await hashPassword(temp.password), mustChangePassword: true, passwordUpdatedAt: new Date(), failedLogins: 0, lockedUntil: null }
+    : {};
   if (existing) {
     // Previously removed: bring them back with the chosen role.
-    await db.user.update({ where: { id: existing.id }, data: { active: true, role: data.role } });
+    await db.user.update({ where: { id: existing.id }, data: { active: true, role: data.role, ...passwordData } });
   } else {
-    await db.user.create({ data: { email: data.email, role: data.role } });
+    await db.user.create({ data: { email: data.email, role: data.role, ...passwordData } });
   }
   refresh();
-  return { ok: true };
+  return { ok: true, password: temp.password };
+}
+
+// Forgotten password: an admin sets a new temporary one. The person is signed
+// out everywhere and must choose their own password at next sign-in.
+export async function resetPassword(input: { id: string; password: "generate" | { typed: string } }): Promise<PasswordResult> {
+  await requireAdmin();
+  const data = z.object({ id }).parse(input);
+  const temp = await temporaryPassword(input.password);
+  if (temp.error || !temp.password) return { error: temp.error ?? "Choose a password." };
+  await db.$transaction([
+    db.user.update({
+      where: { id: data.id },
+      data: { passwordHash: await hashPassword(temp.password), mustChangePassword: true, passwordUpdatedAt: new Date(), failedLogins: 0, lockedUntil: null },
+    }),
+    db.session.deleteMany({ where: { userId: data.id } }),
+  ]);
+  refresh();
+  return { ok: true, password: temp.password };
 }
 
 export async function setRole(input: { id: string; role: "admin" | "member" }): Promise<Result> {

@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { auth, signIn } from "@/auth";
+import { PasswordSignIn } from "@/components/auth/password-sign-in";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -27,7 +28,7 @@ export default function SignInPage({ searchParams }: PageProps<"/signin">) {
           <span className="text-lg font-semibold">WorkManager</span>
         </div>
         <h1 className="text-2xl font-semibold">Sign in</h1>
-        <p className="mt-1 text-sm text-muted">Use your Google account to continue.</p>
+        <p className="mt-1 text-sm text-muted">Use your Google account or your email and password.</p>
         <Suspense fallback={<GoogleButton disabled />}>
           <SignInForm searchParams={searchParams} />
         </Suspense>
@@ -63,6 +64,10 @@ async function SignInForm({ searchParams }: Pick<PageProps<"/signin">, "searchPa
       <form action={signInWithGoogle}>
         <GoogleButton />
       </form>
+      <div className="my-5 flex items-center gap-3 text-xs text-muted" aria-hidden>
+        <span className="h-px flex-1 bg-grid" /> or <span className="h-px flex-1 bg-grid" />
+      </div>
+      <PasswordSignIn callbackUrl={callbackUrl} />
     </>
   );
 }

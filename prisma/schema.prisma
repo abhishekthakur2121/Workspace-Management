@@ -24,6 +24,14 @@ model User {
   emailVerified DateTime?
   role          Role      @default(member)
   active        Boolean   @default(true)
+
+  // Optional email + password sign-in (admins create these; never self sign-up).
+  // passwordHash is scrypt (see src/server/passwords.ts), never the password.
+  passwordHash       String?
+  mustChangePassword Boolean   @default(false) // set by admins; forces a new password at next sign-in
+  passwordUpdatedAt  DateTime?
+  failedLogins       Int       @default(0)
+  lockedUntil        DateTime? // brute-force lockout
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

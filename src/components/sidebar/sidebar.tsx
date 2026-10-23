@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Check, ChevronDown, Home, ListChecks, LogOut, Menu as MenuIcon, Monitor, Moon, Plus, Shield, Star, Sun, X } from "lucide-react";
+import { Check, ChevronDown, Home, KeyRound, ListChecks, LogOut, Menu as MenuIcon, Monitor, Moon, Plus, Shield, Star, Sun, X } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { CreateBoardDialog } from "@/components/create-buttons";
@@ -172,6 +172,9 @@ function Sidebar({ user, nav, onClose }: { user: User; nav: NavData; onClose: ()
                 Manage users
               </MenuItem>
             )}
+            <MenuItem icon={<KeyRound />} onSelect={() => router.push("/account/password")}>
+              Password
+            </MenuItem>
             <MenuSeparator />
             <ThemeItems />
             <MenuSeparator />

@@ -8,11 +8,12 @@ import { isOwner } from "@/server/owners";
 
 declare module "next-auth" {
   interface Session {
-    user: { id: string; role: Role; active: boolean } & DefaultSession["user"];
+    user: { id: string; role: Role; active: boolean; mustChangePassword: boolean } & DefaultSession["user"];
   }
   interface User {
     role?: Role;
     active?: boolean;
+    mustChangePassword?: boolean;
   }
 }
 
@@ -60,6 +61,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = user.id;
       session.user.role = user.role ?? "member";
       session.user.active = user.active ?? false;
+      session.user.mustChangePassword = user.mustChangePassword ?? false;
       return session;
     },
   },

@@ -13,6 +13,8 @@ export async function getTeam() {
       role: true,
       active: true,
       createdAt: true,
+      passwordHash: true,
+      mustChangePassword: true,
       _count: { select: { accounts: true } },
       sessions: { orderBy: { updatedAt: "desc" }, take: 1, select: { updatedAt: true } },
     },
@@ -27,7 +29,10 @@ export async function getTeam() {
     joinedAt: u.createdAt.toISOString(),
     // Sessions are refreshed at most daily, so this is approximate.
     lastActiveAt: u.sessions[0]?.updatedAt.toISOString() ?? null,
-    hasSignedIn: u._count.accounts > 0,
+    // Google sign-ins create an Account row; password sign-ins create sessions.
+    hasSignedIn: u._count.accounts > 0 || (!!u.passwordHash && !u.mustChangePassword) || u.sessions.length > 0,
+    hasPassword: !!u.passwordHash,
+    mustChangePassword: u.mustChangePassword,
   }));
 }
 
