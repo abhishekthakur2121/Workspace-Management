@@ -92,5 +92,6 @@ export async function changePassword(_prev: FormState, form: FormData): Promise<
     // Sign out everywhere else; this browser stays signed in.
     db.session.deleteMany({ where: { userId: me.id, ...(token ? { sessionToken: { not: token } } : {}) } }),
   ]);
-  redirect("/");
+  // First real password: offer the optional profile step next.
+  redirect(user.mustChangePassword ? "/account/profile?welcome=1" : "/");
 }

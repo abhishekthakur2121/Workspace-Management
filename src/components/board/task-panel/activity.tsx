@@ -14,10 +14,11 @@ export function ActivityLog({ items }: { items: ThreadActivity[] }) {
   return (
     <ol className="relative space-y-1 p-6 before:absolute before:top-8 before:bottom-8 before:left-[39px] before:w-px before:bg-grid">
       {items.map((a) => {
-        const name = a.actor.name ?? a.actor.email;
+        // Actor is null once that person was permanently deleted.
+        const name = a.actor ? (a.actor.name ?? a.actor.email) : "Deleted user";
         return (
           <li key={a.id} className="relative flex gap-3 py-2">
-            <Avatar name={name} image={a.actor.image} className="relative size-8 shrink-0 text-xs ring-4 ring-background" />
+            <Avatar name={name} image={a.actor?.image} className={cn("relative size-8 shrink-0 text-xs ring-4 ring-background", !a.actor && "opacity-50 grayscale")} />
             <div className="min-w-0 flex-1 pt-1 text-sm">
               <span className="font-semibold">{name}</span> <Describe a={a} />
               <p className="mt-0.5 text-xs text-muted" title={fullDate(a.createdAt)}>

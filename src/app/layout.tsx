@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Figtree } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 import { DEFAULT_THEME, themeBootScript } from "@/lib/theme";
 
@@ -20,7 +21,21 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        {/* App-wide toasts: the sign-in, password and profile pages use them too. */}
+        <Toaster
+          position="bottom-center"
+          closeButton
+          toastOptions={{
+            classNames: {
+              toast: "!rounded-xl !border-grid !bg-surface !text-foreground !shadow-xl",
+              actionButton: "!bg-primary !text-white !rounded-md",
+              closeButton: "!bg-surface !border-grid !text-muted",
+            },
+          }}
+        />
+      </body>
     </html>
   );
 }

@@ -66,16 +66,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   events: {
-    // Keep name and photo in sync with the Google profile.
+    // Fill in name and photo from Google only when the person hasn't set
+    // their own on the Profile page.
     async signIn({ user, profile }) {
       if (!user.id || !profile) return;
-      await db.user.update({
-        where: { id: user.id },
-        data: {
-          name: profile.name ?? user.name,
-          image: (profile.picture as string | undefined) ?? user.image,
-        },
-      });
+      const current = await db.user.findUnique({ where: { id: user.id }, select: { name: true, image: true } });
+      if (!current) return;
+      const googleImage = profile.picture as string | undefined;
+      const data = {
+        ...(!current.name && profile.name ? { name: profile.name } : {}),
+        ...(!current.image && googleImage ? { image: googleImage } : {}),
+      };
+      if (Object.keys(data).length) await db.user.update({ where: { id: user.id }, data });
     },
   },
 });

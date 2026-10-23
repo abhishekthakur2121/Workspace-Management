@@ -8,6 +8,7 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { requireAdmin } from "@/server/auth-guard";
 import { generatePassword, hashPassword, passwordProblem } from "@/server/passwords";
+import { isOwner } from "@/server/owners";
 
 type Result = { ok: true } | { error: string };
 // A temporary password is returned once so the admin can pass it on.
@@ -105,6 +106,26 @@ export async function reactivateUser(input: { id: string }): Promise<Result> {
   await requireAdmin();
   const data = z.object({ id }).parse(input);
   await db.user.update({ where: { id: data.id }, data: { active: true } });
+  refresh();
+  return { ok: true };
+}
+
+// Removes the person for good: their account, sign-ins, assignments,
+// favourites and photo. Tasks, comments and history they created stay,
+// attributed to "Deleted user" (those links are set to null).
+export async function deleteUserPermanently(input: { id: string }): Promise<Result> {
+  const me = await requireAdmin();
+  const data = z.object({ id }).parse(input);
+  if (data.id === me.id) return { error: "You can't delete yourself. Ask another admin." };
+  const target = await db.user.findUnique({ where: { id: data.id }, select: { email: true, role: true, active: true } });
+  if (!target) return { error: "That person no longer exists." };
+  if (isOwner(target.email)) {
+    return { error: "Owners are set in INITIAL_ADMIN_EMAILS. Remove them from that setting first, or they'd be re-created at their next sign-in." };
+  }
+  if (target.role === "admin" && target.active && (await otherActiveAdmins(data.id)) === 0) {
+    return { error: "There must be at least one admin." };
+  }
+  await db.user.delete({ where: { id: data.id } });
   refresh();
   return { ok: true };
 }

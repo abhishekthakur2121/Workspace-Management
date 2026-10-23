@@ -32,8 +32,8 @@ model User {
   passwordUpdatedAt  DateTime?
   failedLogins       Int       @default(0)
   lockedUntil        DateTime? // brute-force lockout
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   accounts Account[]
   sessions Session[]
@@ -45,6 +45,18 @@ model User {
   activities       Activity[]
   favorites        Favorite[]
   boardVisits      BoardVisit[]
+  avatar           Avatar?
+}
+
+// Uploaded profile picture, kept out of the User row so loading a user (on
+// every request) never pulls image bytes. Served by /api/avatars/[userId].
+model Avatar {
+  userId      String   @id
+  data        Bytes
+  contentType String
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // Auth.js tables (shape required by @auth/prisma-adapter)
@@ -187,7 +199,7 @@ model Task {
   priority       Priority?
   position       String // order within its group (table view)
   kanbanPosition String // order within its status column (kanban view)
-  createdById    String
+  createdById    String? // null once the creator is permanently deleted
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
@@ -198,7 +210,7 @@ model Task {
   subtasks    Task[]       @relation("Subtasks")
   accountable User?        @relation("TaskAccountable", fields: [accountableId], references: [id], onDelete: SetNull)
   status      StatusLabel? @relation(fields: [statusId], references: [id], onDelete: SetNull)
-  createdBy   User         @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  createdBy   User?        @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   responsible TaskResponsible[]
   tags        TaskTag[]
@@ -237,14 +249,14 @@ model TaskTag {
 model Comment {
   id        String    @id @default(cuid())
   taskId    String
-  authorId  String
+  authorId  String? // null once the author is permanently deleted
   body      String
   createdAt DateTime  @default(now())
   editedAt  DateTime?
   deletedAt DateTime?
 
-  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  author User @relation(fields: [authorId], references: [id])
+  task   Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
 
   @@index([taskId, createdAt])
 }
@@ -254,7 +266,7 @@ model Activity {
   id        String   @id @default(cuid())
   taskId    String
   boardId   String
-  actorId   String
+  actorId   String? // null once the actor is permanently deleted
   action    String // created | updated | deleted | restored | moved | commented
   field     String?
   oldValue  Json?
@@ -263,7 +275,7 @@ model Activity {
 
   task  Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
   board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  actor User  @relation(fields: [actorId], references: [id])
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([taskId, createdAt])
 }

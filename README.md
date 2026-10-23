@@ -11,7 +11,8 @@ A free, self-hosted work-management tool for a small agency (up to ~20 internal 
 - Two ways to sign in: **Google**, or **email + password** for people an admin gives a password.
 - Admins set an initial password (typed, or generated and shown once). On first sign-in the person must choose their own; forgotten passwords are reset by an admin.
 - Passwords are stored only as salted `scrypt` hashes. Five wrong attempts lock the account for 15 minutes.
-- Removing a person signs them out immediately (database sessions). Their past work and comments stay, shown greyed out.
+- After choosing a password, people can optionally add their name and a profile photo (also under **Profile** in the user menu).
+- Removing a person signs them out immediately (database sessions); their work stays, shown greyed out. Admins can also delete a person permanently: their work stays, attributed to "Deleted user".
 
 **How work is organised**
 - **Workspace:** e.g. one per client, or any grouping you like.

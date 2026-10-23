@@ -102,9 +102,11 @@ function CommentItem({ comment, setThread }: { comment: ThreadComment; setThread
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(comment.body);
   const [confirming, setConfirming] = useState(false);
-  const mine = comment.author.id === currentUserId;
+  // Author is null once that person was permanently deleted.
+  const author = comment.author;
+  const mine = author?.id === currentUserId;
   const pending = comment.id.startsWith("temp-");
-  const name = comment.author.name ?? comment.author.email;
+  const name = author ? (author.name ?? author.email) : "Deleted user";
 
   function save() {
     const body = draft.trim();
@@ -134,7 +136,7 @@ function CommentItem({ comment, setThread }: { comment: ThreadComment; setThread
   return (
     <li className={cn("anim-page card-shadow group/comment rounded-xl border border-grid bg-surface p-4", pending && "opacity-70")}>
       <div className="flex items-center gap-2.5">
-        <Avatar name={name} image={comment.author.image} className={cn("size-8 text-xs", !comment.author.active && "opacity-50 grayscale")} />
+        <Avatar name={name} image={author?.image} className={cn("size-8 text-xs", !author?.active && "opacity-50 grayscale")} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{name}</p>
           <p className="text-xs text-muted" title={fullDate(comment.createdAt)}>

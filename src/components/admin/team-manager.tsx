@@ -7,6 +7,7 @@ import {
   KeyRound,
   MoreHorizontal,
   Shield,
+  Trash2,
   UserCheck,
   UserMinus,
   UserPlus,
@@ -34,6 +35,7 @@ import { SearchField } from "@/components/ui/search-field";
 import {
   addUser,
   deactivateUser,
+  deleteUserPermanently,
   reactivateUser,
   resetPassword,
   setRole,
@@ -469,6 +471,7 @@ function RowActions({
 }) {
   const [confirming, setConfirming] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const name = u.name ?? u.email;
 
   if (confirming) {
@@ -534,6 +537,11 @@ function RowActions({
               Restore access
             </MenuItem>
           )}
+          {!isMe && (
+            <MenuItem danger icon={<Trash2 />} onSelect={() => setDeleting(true)}>
+              Delete permanently
+            </MenuItem>
+          )}
           <MenuSeparator />
           <MenuLabel>Joined {fullDate(u.joinedAt)}</MenuLabel>
         </MenuContent>
@@ -543,6 +551,37 @@ function RowActions({
         open={resetting}
         onOpenChange={setResetting}
       />
+      <Dialog open={deleting} onOpenChange={setDeleting}>
+        {deleting && (
+          <DialogContent
+            title="Are you sure?"
+            description={
+              <>
+                <strong className="text-foreground">{name}</strong> will be deleted permanently and can&apos;t sign in
+                again unless re-added. Tasks, comments and history they created stay, shown as &quot;Deleted user&quot;.
+              </>
+            }
+          >
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setDeleting(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() =>
+                  act(
+                    () => deleteUserPermanently({ id: u.id }),
+                    `${name} was deleted permanently.`,
+                    () => setDeleting(false),
+                  )
+                }
+              >
+                <Trash2 className="size-4" /> Delete permanently
+              </Button>
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
     </>
   );
 }
