@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { auth, signIn } from "@/auth";
 import { PasswordSignIn } from "@/components/auth/password-sign-in";
+import { BrandLogo } from "@/components/brand-logo";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -21,11 +22,8 @@ export default function SignInPage({ searchParams }: PageProps<"/signin">) {
   return (
     <main className="flex flex-1 items-center justify-center p-4">
       <div className="anim-dialog w-full max-w-sm rounded-2xl border border-grid bg-surface p-8 shadow-xl shadow-black/5">
-        <div className="mb-6 flex items-center gap-2">
-          <span className="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-[#2f8cff] to-[#6c4cf5] text-sm font-bold text-white shadow-sm shadow-primary/30">
-            W
-          </span>
-          <span className="text-lg font-semibold">WorkManager</span>
+        <div className="mb-7">
+          <BrandLogo size="lg" />
         </div>
         <h1 className="text-2xl font-semibold">Sign in</h1>
         <p className="mt-1 text-sm text-muted">Use your Google account or your email and password.</p>

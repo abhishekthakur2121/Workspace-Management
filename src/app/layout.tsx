@@ -10,7 +10,7 @@ const figtree = Figtree({
 });
 
 export const metadata: Metadata = {
-  title: { default: "WorkManager", template: "%s · WorkManager" },
+  title: { default: "Nxt Workspace Manager", template: "%s · Nxt Workspace Manager" },
   description: "Boards, tasks and progress for the team.",
 };
 

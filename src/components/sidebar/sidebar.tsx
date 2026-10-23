@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, ChevronDown, Home, KeyRound, ListChecks, LogOut, Menu as MenuIcon, Monitor, Moon, Plus, Shield, Star, Sun, UserRound, X } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
+import { BrandLogo } from "@/components/brand-logo";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { CreateBoardDialog } from "@/components/create-buttons";
 import { BoardLink, BoardList } from "./board-list";
@@ -54,7 +55,7 @@ export function AppShell({ user, nav, children }: { user: User; nav: NavData; ch
           <button aria-label="Open menu" onClick={() => setMobileOpen(true)} className="rounded p-1.5 hover:bg-hover">
             <MenuIcon className="size-5" />
           </button>
-          <span className="font-semibold">WorkManager</span>
+          <BrandLogo size="sm" />
         </div>
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
@@ -91,9 +92,8 @@ function Sidebar({ user, nav, onClose }: { user: User; nav: NavData; onClose: ()
   return (
     <>
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
-        <Link href="/" className="group/logo flex items-center gap-2">
-          <span className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-[#2f8cff] to-[#6c4cf5] text-sm font-bold text-white shadow-sm shadow-primary/30 transition-transform duration-200 group-hover/logo:rotate-[-6deg]">W</span>
-          <span className="font-semibold">WorkManager</span>
+        <Link href="/" aria-label="Nxt Workspace Manager home" className="rounded-md transition-opacity hover:opacity-85">
+          <BrandLogo />
         </Link>
         <button aria-label="Close menu" onClick={onClose} className="rounded p-1 hover:bg-hover md:hidden">
           <X className="size-4" />
