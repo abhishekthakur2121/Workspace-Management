@@ -18,7 +18,7 @@ export default async function BoardPage({ params }: PageProps<"/b/[boardId]">) {
   return (
     <>
       <BoardHeader board={board} isFavorite={nav.favoriteBoardIds.includes(board.id)} />
-      <BoardView board={board} currentUserId={user.id} isAdmin={user.role === "admin"} />
+      <BoardView board={board} currentUserId={user.id} isAdmin={user.role === "super_admin" || user.role === "admin"} />
     </>
   );
 }

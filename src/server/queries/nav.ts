@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { db } from "@/server/db";
-import { isSuperAdmin, visibleBoardWhere, visibleWorkspaceWhere, type Actor } from "@/server/access";
+import { isAppAdmin, isSuperAdmin, visibleBoardWhere, visibleWorkspaceWhere, type Actor } from "@/server/access";
 
 // Everything the sidebar needs: the workspaces and boards this person can
 // see, with what they may do there. cache() dedupes the layout's and the
@@ -16,7 +16,7 @@ export const getNavData = cache(async (user: Actor) => {
         id: true,
         name: true,
         color: true,
-        members: { where: { userId: user.id }, select: { role: true, canCreateBoards: true } },
+        members: { where: { userId: user.id }, select: { role: true } },
         boards: {
           where: { deletedAt: null, ...visibleBoardWhere(user) },
           orderBy: { position: "asc" },
@@ -35,15 +35,17 @@ export const getNavData = cache(async (user: Actor) => {
     workspaces: workspaces.map(({ members, boards, ...w }) => {
       const me = members[0];
       const isAdmin = superAdmin || me?.role === "admin";
+      const isEditor = me?.role === "editor";
       return {
         ...w,
         isAdmin,
-        canCreateBoards: isAdmin || !!me?.canCreateBoards,
-        boards: boards.map(({ createdById, ...b }) => ({ ...b, canManage: isAdmin || createdById === user.id })),
+        role: superAdmin ? ("admin" as const) : (me?.role ?? null),
+        canCreateBoards: isAdmin || isEditor,
+        boards: boards.map(({ createdById, ...b }) => ({ ...b, canManage: isAdmin || (isEditor && createdById === user.id) })),
       };
     }),
     favoriteBoardIds: favorites.map((f) => f.boardId),
-    canCreateWorkspaces: superAdmin || !!user.canCreateWorkspaces,
+    canCreateWorkspaces: isAppAdmin(user),
   };
 });
 

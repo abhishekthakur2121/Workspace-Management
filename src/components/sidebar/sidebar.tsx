@@ -15,7 +15,9 @@ import { cn } from "@/lib/utils";
 import { usePersistentState } from "@/lib/use-persistent-state";
 import { DEFAULT_THEME, THEME_KEY, applyTheme, type Theme } from "@/lib/theme";
 
-type User = { name?: string | null; email?: string | null; image?: string | null; role: "admin" | "member" };
+type User = { name?: string | null; email?: string | null; image?: string | null; role: "super_admin" | "admin" | "user" };
+
+const ROLE_LABELS = { super_admin: "Super admin", admin: "Admin", user: "User" } as const;
 
 const LAST_WORKSPACE_KEY = "wm:lastWorkspace";
 const noopSubscribe = () => () => {};
@@ -101,7 +103,7 @@ function Sidebar({ user, nav, onClose }: { user: User; nav: NavData; onClose: ()
       <nav className="space-y-0.5 px-2">
         <NavItem href="/" icon={<Home />} label="Home" active={pathname === "/"} />
         <NavItem href="/my-work" icon={<ListChecks />} label="My work" active={pathname === "/my-work"} />
-        {user.role === "admin" && (
+        {user.role !== "user" && (
           <NavItem href="/admin/users" icon={<Shield />} label="Users" active={pathname.startsWith("/admin")} />
         )}
       </nav>
@@ -163,13 +165,13 @@ function Sidebar({ user, nav, onClose }: { user: User; nav: NavData; onClose: ()
               <Avatar name={user.name ?? user.email ?? "?"} image={user.image} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">{user.name ?? user.email}</span>
-                <span className="block text-xs text-muted capitalize">{user.role}</span>
+                <span className="block text-xs text-muted">{ROLE_LABELS[user.role]}</span>
               </span>
             </button>
           </MenuTrigger>
           <MenuContent side="top" className="w-56">
             <MenuLabel>{user.email}</MenuLabel>
-            {user.role === "admin" && (
+            {user.role !== "user" && (
               <MenuItem icon={<Shield />} onSelect={() => router.push("/admin/users")}>
                 Manage users
               </MenuItem>

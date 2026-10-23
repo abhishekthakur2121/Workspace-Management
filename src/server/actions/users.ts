@@ -1,7 +1,11 @@
 "use server";
 
-// Admin-only management of the allowlist. Actions return { error } instead of
-// throwing, because thrown messages are hidden from the browser in production.
+// Managing people. Actions return { error } instead of throwing, because
+// thrown messages are hidden from the browser in production.
+//
+//   Super admins manage everyone (owners can't be demoted, removed or
+//   deleted here). Admins manage only people with the User role, and can
+//   only add new people as Users.
 
 import { refresh } from "next/cache";
 import { z } from "zod";
@@ -13,6 +17,7 @@ import { isOwner } from "@/server/owners";
 type Result = { ok: true } | { error: string };
 // A temporary password is returned once so the admin can pass it on.
 type PasswordResult = { ok: true; password?: string } | { error: string };
+type AppRole = "super_admin" | "admin" | "user";
 
 // "generate" → a random readable password; { typed } → the admin's own choice.
 type PasswordChoice = "none" | "generate" | { typed: string };
@@ -24,22 +29,38 @@ async function temporaryPassword(choice: PasswordChoice) {
 }
 
 const id = z.string().min(1);
-const role = z.enum(["admin", "member"]);
+const role = z.enum(["super_admin", "admin", "user"]);
 const email = z.string().trim().toLowerCase().email("Enter a valid email address").max(254);
 
-const otherActiveAdmins = (exceptId: string) =>
-  db.user.count({ where: { role: "admin", active: true, id: { not: exceptId } } });
+type Actor = Awaited<ReturnType<typeof requireAdmin>>;
 
-export async function addUser(input: { email: string; role: "admin" | "member"; password: PasswordChoice }): Promise<PasswordResult> {
-  await requireAdmin();
+// Can `actor` change this person at all?
+async function checkTarget(actor: Actor, targetId: string): Promise<{ error: string } | { email: string; role: AppRole; active: boolean }> {
+  const target = await db.user.findUnique({ where: { id: targetId }, select: { email: true, role: true, active: true } });
+  if (!target) return { error: "That person no longer exists." };
+  if (actor.role !== "super_admin" && target.role !== "user") {
+    return { error: "Only super admins can change admins and super admins." };
+  }
+  return target;
+}
+
+const otherActiveSuperAdmins = (exceptId: string) =>
+  db.user.count({ where: { role: "super_admin", active: true, id: { not: exceptId } } });
+
+export async function addUser(input: { email: string; role: AppRole; password: PasswordChoice }): Promise<PasswordResult> {
+  const actor = await requireAdmin();
   const parsed = z.object({ email, role }).safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   const data = parsed.data;
+  if (actor.role !== "super_admin" && data.role !== "user") return { error: "Admins can only add people as Users." };
   const temp = await temporaryPassword(input.password);
   if (temp.error) return { error: temp.error };
 
-  const existing = await db.user.findUnique({ where: { email: data.email }, select: { id: true, active: true } });
+  const existing = await db.user.findUnique({ where: { email: data.email }, select: { id: true, active: true, role: true } });
   if (existing?.active) return { error: `${data.email} is already on the team.` };
+  if (existing && actor.role !== "super_admin" && existing.role !== "user") {
+    return { error: "Only super admins can restore admins and super admins." };
+  }
   // With a password, they must choose their own at first sign-in.
   const passwordData = temp.password
     ? { passwordHash: await hashPassword(temp.password), mustChangePassword: true, passwordUpdatedAt: new Date(), failedLogins: 0, lockedUntil: null }
@@ -54,11 +75,13 @@ export async function addUser(input: { email: string; role: "admin" | "member"; 
   return { ok: true, password: temp.password };
 }
 
-// Forgotten password: an admin sets a new temporary one. The person is signed
-// out everywhere and must choose their own password at next sign-in.
+// Forgotten password: a new temporary one. The person is signed out
+// everywhere and must choose their own password at next sign-in.
 export async function resetPassword(input: { id: string; password: "generate" | { typed: string } }): Promise<PasswordResult> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const data = z.object({ id }).parse(input);
+  const target = await checkTarget(actor, data.id);
+  if ("error" in target) return target;
   const temp = await temporaryPassword(input.password);
   if (temp.error || !temp.password) return { error: temp.error ?? "Choose a password." };
   await db.$transaction([
@@ -72,11 +95,18 @@ export async function resetPassword(input: { id: string; password: "generate" | 
   return { ok: true, password: temp.password };
 }
 
-export async function setRole(input: { id: string; role: "admin" | "member" }): Promise<Result> {
-  await requireAdmin();
+// Only super admins change roles.
+export async function setRole(input: { id: string; role: AppRole }): Promise<Result> {
+  const actor = await requireAdmin();
+  if (actor.role !== "super_admin") return { error: "Only super admins can change roles." };
   const data = z.object({ id, role }).parse(input);
-  if (data.role === "member" && (await otherActiveAdmins(data.id)) === 0) {
-    return { error: "There must be at least one admin. Make someone else an admin first." };
+  const target = await db.user.findUnique({ where: { id: data.id }, select: { email: true, role: true } });
+  if (!target) return { error: "That person no longer exists." };
+  if (isOwner(target.email) && data.role !== "super_admin") {
+    return { error: "Owners (INITIAL_ADMIN_EMAILS) are always super admins." };
+  }
+  if (target.role === "super_admin" && data.role !== "super_admin" && (await otherActiveSuperAdmins(data.id)) === 0) {
+    return { error: "There must be at least one super admin." };
   }
   await db.user.update({ where: { id: data.id }, data: { role: data.role } });
   refresh();
@@ -86,13 +116,14 @@ export async function setRole(input: { id: string; role: "admin" | "member" }): 
 // Blocks the person immediately: sessions are database-backed, so deleting
 // them signs the person out on their next request.
 export async function deactivateUser(input: { id: string }): Promise<Result> {
-  const me = await requireAdmin();
+  const actor = await requireAdmin();
   const data = z.object({ id }).parse(input);
-  if (data.id === me.id) return { error: "You can't remove yourself. Ask another admin." };
-  const target = await db.user.findUnique({ where: { id: data.id }, select: { role: true } });
-  if (!target) return { error: "That person no longer exists." };
-  if (target.role === "admin" && (await otherActiveAdmins(data.id)) === 0) {
-    return { error: "There must be at least one admin." };
+  if (data.id === actor.id) return { error: "You can't remove yourself. Ask another admin." };
+  const target = await checkTarget(actor, data.id);
+  if ("error" in target) return target;
+  if (isOwner(target.email)) return { error: "Owners (INITIAL_ADMIN_EMAILS) can't be removed here." };
+  if (target.role === "super_admin" && (await otherActiveSuperAdmins(data.id)) === 0) {
+    return { error: "There must be at least one super admin." };
   }
   await db.$transaction([
     db.user.update({ where: { id: data.id }, data: { active: false } }),
@@ -103,38 +134,31 @@ export async function deactivateUser(input: { id: string }): Promise<Result> {
 }
 
 export async function reactivateUser(input: { id: string }): Promise<Result> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const data = z.object({ id }).parse(input);
+  const target = await checkTarget(actor, data.id);
+  if ("error" in target) return target;
   await db.user.update({ where: { id: data.id }, data: { active: true } });
   refresh();
   return { ok: true };
 }
 
 // Removes the person for good: their account, sign-ins, assignments,
-// favourites and photo. Tasks, comments and history they created stay,
-// attributed to "Deleted user" (those links are set to null).
+// memberships, favourites and photo. Tasks, comments and history they created
+// stay, attributed to "Deleted user" (those links are set to null).
 export async function deleteUserPermanently(input: { id: string }): Promise<Result> {
-  const me = await requireAdmin();
+  const actor = await requireAdmin();
   const data = z.object({ id }).parse(input);
-  if (data.id === me.id) return { error: "You can't delete yourself. Ask another admin." };
-  const target = await db.user.findUnique({ where: { id: data.id }, select: { email: true, role: true, active: true } });
-  if (!target) return { error: "That person no longer exists." };
+  if (data.id === actor.id) return { error: "You can't delete yourself. Ask another admin." };
+  const target = await checkTarget(actor, data.id);
+  if ("error" in target) return target;
   if (isOwner(target.email)) {
     return { error: "Owners are set in INITIAL_ADMIN_EMAILS. Remove them from that setting first, or they'd be re-created at their next sign-in." };
   }
-  if (target.role === "admin" && target.active && (await otherActiveAdmins(data.id)) === 0) {
-    return { error: "There must be at least one admin." };
+  if (target.role === "super_admin" && target.active && (await otherActiveSuperAdmins(data.id)) === 0) {
+    return { error: "There must be at least one super admin." };
   }
   await db.user.delete({ where: { id: data.id } });
-  refresh();
-  return { ok: true };
-}
-
-// Super admins decide who besides themselves may create workspaces.
-export async function setCanCreateWorkspaces(input: { id: string; value: boolean }): Promise<Result> {
-  await requireAdmin();
-  const data = z.object({ id, value: z.boolean() }).parse(input);
-  await db.user.update({ where: { id: data.id }, data: { canCreateWorkspaces: data.value } });
   refresh();
   return { ok: true };
 }

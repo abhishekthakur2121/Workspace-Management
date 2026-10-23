@@ -8,13 +8,12 @@ import { isOwner } from "@/server/owners";
 
 declare module "next-auth" {
   interface Session {
-    user: { id: string; role: Role; active: boolean; mustChangePassword: boolean; canCreateWorkspaces: boolean } & DefaultSession["user"];
+    user: { id: string; role: Role; active: boolean; mustChangePassword: boolean } & DefaultSession["user"];
   }
   interface User {
     role?: Role;
     active?: boolean;
     mustChangePassword?: boolean;
-    canCreateWorkspaces?: boolean;
   }
 }
 
@@ -52,7 +51,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Owners (INITIAL_ADMIN_EMAILS) get in before anyone has used the admin page.
       if (isOwner(email)) {
         await db.user.create({
-          data: { email, name: user.name, image: user.image, role: "admin" },
+          data: { email, name: user.name, image: user.image, role: "super_admin" },
         });
         return true;
       }
@@ -60,10 +59,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     session({ session, user }) {
       session.user.id = user.id;
-      session.user.role = user.role ?? "member";
+      // Owners (INITIAL_ADMIN_EMAILS) are always super admins.
+      session.user.role = isOwner(user.email) ? "super_admin" : (user.role ?? "user");
       session.user.active = user.active ?? false;
       session.user.mustChangePassword = user.mustChangePassword ?? false;
-      session.user.canCreateWorkspaces = user.role === "admin" || (user.canCreateWorkspaces ?? false);
       return session;
     },
   },

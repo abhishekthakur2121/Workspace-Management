@@ -5,15 +5,17 @@ import type { Prisma } from "@/generated/prisma/client";
 // Who can see and change what. Every query and server action goes through
 // these helpers; hiding buttons in the UI is only cosmetic.
 //
-//   Super admin (User.role = admin)   everything, everywhere
-//   Workspace admin                   everything inside that workspace,
-//                                     including every board in it
-//   Board creator                     manages their board (name, access)
-//   Workspace member                  sees boards shared with the whole
-//                                     workspace or with them, and edits
-//                                     tasks on any board they can see
+//   App: super_admin   everything, everywhere
+//        admin         creates workspaces, manages Users; sees only the
+//                      workspaces they're a member of
+//        user          works inside workspaces they're added to
+//   Workspace: admin   everything inside it, including every board
+//              editor  creates boards; manages the boards they created
+//              member  edits tasks on boards they can see
+//   Boards are visible to the whole workspace or to selected people
+//   (workspace admins and the creator always see them).
 
-export type Actor = { id: string; role: "admin" | "member"; canCreateWorkspaces?: boolean };
+export type Actor = { id: string; role: "super_admin" | "admin" | "user" };
 
 export class AccessError extends Error {
   constructor(message = "You don't have access to that.") {
@@ -21,7 +23,9 @@ export class AccessError extends Error {
   }
 }
 
-export const isSuperAdmin = (u: Actor) => u.role === "admin";
+export const isSuperAdmin = (u: Actor) => u.role === "super_admin";
+// App admins (and super admins) may create workspaces and manage people.
+export const isAppAdmin = (u: Actor) => u.role === "super_admin" || u.role === "admin";
 
 // ─── list filters (Prisma where clauses) ─────────────────────────────────────
 
@@ -58,18 +62,16 @@ export async function assertWorkspaceAdmin(u: Actor, workspaceId: string) {
 }
 
 export async function canCreateWorkspace(u: Actor) {
-  if (isSuperAdmin(u)) return true;
-  const row = await db.user.findUnique({ where: { id: u.id }, select: { canCreateWorkspaces: true } });
-  return !!row?.canCreateWorkspaces;
+  return isAppAdmin(u);
 }
 
 export async function canCreateBoard(u: Actor, workspaceId: string) {
   if (isSuperAdmin(u)) return true;
   const m = await db.workspaceMember.findUnique({
     where: { workspaceId_userId: { workspaceId, userId: u.id } },
-    select: { role: true, canCreateBoards: true },
+    select: { role: true },
   });
-  return !!m && (m.role === "admin" || m.canCreateBoards);
+  return m?.role === "admin" || m?.role === "editor";
 }
 
 export async function boardAccess(u: Actor, boardId: string) {
@@ -79,7 +81,8 @@ export async function boardAccess(u: Actor, boardId: string) {
   });
   if (!board) return { canSee: false, canManage: false, workspaceId: null };
   const role = await workspaceRole(u, board.workspaceId);
-  const canManage = role === "admin" || (role !== null && board.createdById === u.id);
+  // Workspace admins manage every board; editors manage the boards they created.
+  const canManage = role === "admin" || (role === "editor" && board.createdById === u.id);
   const canSee = canManage || (role !== null && (board.visibility === "workspace" || board.members.length > 0));
   return { canSee, canManage, workspaceId: board.workspaceId };
 }

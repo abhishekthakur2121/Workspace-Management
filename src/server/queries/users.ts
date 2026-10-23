@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/server/db";
+import { isOwner } from "@/server/owners";
 
 // Everyone on the allowlist, with sign-in state for the admin page.
 export async function getTeam() {
@@ -15,7 +16,6 @@ export async function getTeam() {
       createdAt: true,
       passwordHash: true,
       mustChangePassword: true,
-      canCreateWorkspaces: true,
       _count: { select: { accounts: true } },
       sessions: { orderBy: { updatedAt: "desc" }, take: 1, select: { updatedAt: true } },
     },
@@ -25,7 +25,7 @@ export async function getTeam() {
     name: u.name,
     email: u.email,
     image: u.image,
-    role: u.role,
+    role: isOwner(u.email) ? ("super_admin" as const) : u.role,
     active: u.active,
     joinedAt: u.createdAt.toISOString(),
     // Sessions are refreshed at most daily, so this is approximate.
@@ -34,7 +34,8 @@ export async function getTeam() {
     hasSignedIn: u._count.accounts > 0 || (!!u.passwordHash && !u.mustChangePassword) || u.sessions.length > 0,
     hasPassword: !!u.passwordHash,
     mustChangePassword: u.mustChangePassword,
-    canCreateWorkspaces: u.role === "admin" || u.canCreateWorkspaces,
+    // Owners (INITIAL_ADMIN_EMAILS) are always super admins and locked here.
+    isOwner: isOwner(u.email),
   }));
 }
 

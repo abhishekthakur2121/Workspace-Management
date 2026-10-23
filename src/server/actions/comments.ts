@@ -6,7 +6,7 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { requireUser } from "@/server/auth-guard";
-import { assertCanSeeTasks } from "@/server/access";
+import { assertCanSeeTasks, isAppAdmin } from "@/server/access";
 import type { Prisma } from "@/generated/prisma/client";
 
 const id = z.string().min(1);
@@ -74,7 +74,7 @@ async function ownComment(commentId: string, allowAdmin: boolean) {
     select: { authorId: true, taskId: true },
   });
   await assertCanSeeTasks(user, [comment.taskId]);
-  const allowed = comment.authorId === user.id || (allowAdmin && user.role === "admin");
+  const allowed = comment.authorId === user.id || (allowAdmin && isAppAdmin(user));
   if (!allowed) throw new Error("Not allowed");
   return comment;
 }

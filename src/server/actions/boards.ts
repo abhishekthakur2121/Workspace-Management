@@ -22,9 +22,21 @@ const DEFAULT_GROUPS = [
   { name: "Backlog", color: "#a25ddc" },
 ];
 
-export async function createBoard(input: { workspaceId: string; name: string }) {
+export async function createBoard(input: {
+  workspaceId: string;
+  name: string;
+  visibility?: "workspace" | "private";
+  userIds?: string[];
+}) {
   const user = await requireUser();
-  const data = z.object({ workspaceId: id, name }).parse(input);
+  const data = z
+    .object({
+      workspaceId: id,
+      name,
+      visibility: z.enum(["workspace", "private"]).default("workspace"),
+      userIds: z.array(id).max(500).default([]),
+    })
+    .parse(input);
   if (!(await canCreateBoard(user, data.workspaceId))) {
     throw new AccessError("You don't have permission to create boards in this workspace.");
   }
@@ -37,13 +49,22 @@ export async function createBoard(input: { workspaceId: string; name: string }) 
   const statusKeys = positionsFromStart(DEFAULT_STATUSES.length);
   const groupKeys = positionsFromStart(DEFAULT_GROUPS.length);
 
-  // New boards are visible to the whole workspace; the creator can narrow it.
+  // Chosen in the New board dialog: the whole workspace, or selected members.
+  const shareWith =
+    data.visibility === "private"
+      ? await db.workspaceMember.findMany({
+          where: { workspaceId: data.workspaceId, userId: { in: data.userIds, not: user.id } },
+          select: { userId: true },
+        })
+      : [];
   const board = await db.board.create({
     data: {
       workspaceId: data.workspaceId,
       name: data.name,
       position: positionAfter(last?.position),
       createdById: user.id,
+      visibility: data.visibility,
+      members: { create: shareWith.map((m) => ({ userId: m.userId })) },
       statuses: { create: DEFAULT_STATUSES.map((s, i) => ({ ...s, position: statusKeys[i] })) },
       groups: { create: DEFAULT_GROUPS.map((g, i) => ({ ...g, position: groupKeys[i] })) },
     },

@@ -29,8 +29,16 @@ export const requireUser = cache(async () => {
   return user;
 });
 
+// Super admins and admins: may manage people (admins only Users) and create
+// workspaces. See src/server/access.ts for everything else.
 export async function requireAdmin() {
   const user = await requireUser();
-  if (user.role !== "admin") redirect("/");
+  if (user.role !== "super_admin" && user.role !== "admin") redirect("/");
+  return user;
+}
+
+export async function requireSuperAdmin() {
+  const user = await requireUser();
+  if (user.role !== "super_admin") redirect("/");
   return user;
 }

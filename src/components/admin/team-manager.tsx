@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useState } from "react";
+import { createContext, startTransition, use, useState } from "react";
 import {
   Check,
   ChevronDown,
@@ -14,7 +14,6 @@ import {
   Users,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Switch } from "@/components/access/workspace-members-dialog";
 import {
   MIN_PASSWORD_LENGTH,
   PasswordChoiceField,
@@ -39,7 +38,6 @@ import {
   deleteUserPermanently,
   reactivateUser,
   resetPassword,
-  setCanCreateWorkspaces,
   setRole,
 } from "@/server/actions/users";
 import type { TeamMember } from "@/server/queries/users";
@@ -47,6 +45,17 @@ import { fullDate, timeAgo } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 type Role = TeamMember["role"];
+
+export const APP_ROLES: { id: Role; label: string; text: string }[] = [
+  { id: "super_admin", label: "Super admin", text: "Everything: all workspaces, all people" },
+  { id: "admin", label: "Admin", text: "Creates workspaces; manages Users" },
+  { id: "user", label: "User", text: "Works in workspaces they're added to" },
+];
+const roleLabel = (r: Role) => APP_ROLES.find((x) => x.id === r)!.label;
+
+// The viewer's own role: super admins manage everyone, admins only Users.
+const ActorRole = createContext<Role>("user");
+const canManagePerson = (actor: Role, target: TeamMember) => actor === "super_admin" || target.role === "user";
 type Result = { ok: true } | { error: string };
 
 // Runs an admin action and reports the outcome as a toast.
@@ -72,9 +81,11 @@ function act(
 export function TeamManager({
   team,
   currentUserId,
+  actorRole,
 }: {
   team: TeamMember[];
   currentUserId: string;
+  actorRole: Role;
 }) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -83,13 +94,14 @@ export function TeamManager({
       !q || u.email.includes(q) || (u.name ?? "").toLowerCase().includes(q),
   );
   const active = team.filter((u) => u.active);
-  const admins = active.filter((u) => u.role === "admin").length;
+  const admins = active.filter((u) => u.role !== "user").length;
 
   return (
+    <ActorRole value={actorRole}>
     <div className="space-y-6 p-6">
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat icon={<Users />} label="Active people" value={active.length} />
-        <Stat icon={<Shield />} label="Admins" value={admins} />
+        <Stat icon={<Shield />} label="Admins & super admins" value={admins} />
         <Stat
           icon={<UserPlus />}
           label="Invited, not signed in yet"
@@ -129,6 +141,7 @@ export function TeamManager({
         as greyed out.
       </p>
     </div>
+    </ActorRole>
   );
 }
 
@@ -155,8 +168,9 @@ function Stat({
 }
 
 function AddPerson() {
+  const actorRole = use(ActorRole);
   const [email, setEmail] = useState("");
-  const [role, setNewRole] = useState<Role>("member");
+  const [role, setNewRole] = useState<Role>("user");
   const [mode, setMode] = useState<PasswordMode>("none");
   const [typed, setTyped] = useState("");
   const [pending, setPending] = useState(false);
@@ -233,12 +247,13 @@ function AddPerson() {
             aria-label="Role"
             className="mt-1.5 flex h-9 rounded-md border border-border p-0.5"
           >
-            {(["member", "admin"] as const).map((r) => (
+            {(actorRole === "super_admin" ? (["user", "admin", "super_admin"] as const) : (["user"] as const)).map((r) => (
               <button
                 key={r}
                 type="button"
                 role="radio"
                 aria-checked={role === r}
+                title={APP_ROLES.find((x) => x.id === r)!.text}
                 onClick={() => setNewRole(r)}
                 className={cn(
                   "rounded px-3 text-sm font-normal capitalize transition-colors",
@@ -247,7 +262,7 @@ function AddPerson() {
                     : "text-muted hover:text-foreground",
                 )}
               >
-                {r}
+                {roleLabel(r)}
               </button>
             ))}
           </div>
@@ -419,20 +434,6 @@ function MemberRow({ member: u, isMe }: { member: TeamMember; isMe: boolean }) {
       >
         {status}
       </span>
-      <label
-        className={cn("hidden items-center gap-2 text-xs lg:inline-flex", u.role === "admin" || !u.active ? "text-muted" : "cursor-pointer")}
-        title={u.role === "admin" ? "Super admins can always create workspaces" : undefined}
-      >
-        <Switch
-          checked={u.canCreateWorkspaces}
-          disabled={u.role === "admin" || !u.active}
-          onChange={(on) =>
-            act(() => setCanCreateWorkspaces({ id: u.id, value: on }), on ? `${u.name ?? u.email} can now create workspaces.` : `${u.name ?? u.email} can no longer create workspaces.`)
-          }
-          label={`${u.name ?? u.email} can create workspaces`}
-        />
-        Creates workspaces
-      </label>
       <RoleMenu member={u} />
       <RowActions member={u} isMe={isMe} />
     </li>
@@ -440,36 +441,34 @@ function MemberRow({ member: u, isMe }: { member: TeamMember; isMe: boolean }) {
 }
 
 function RoleMenu({ member: u }: { member: TeamMember }) {
+  const actorRole = use(ActorRole);
+  // Only super admins change roles; owners are always super admins.
+  const locked = actorRole !== "super_admin" || u.isOwner || !u.active;
   return (
     <Menu>
       <MenuTrigger asChild>
         <button
-          disabled={!u.active}
-          className="inline-flex h-8 w-28 items-center justify-between gap-1 rounded-md border border-grid px-2.5 text-sm capitalize transition hover:bg-hover disabled:opacity-50"
-          aria-label={`Role: ${u.role}`}
+          disabled={locked}
+          title={u.isOwner ? "Owner (INITIAL_ADMIN_EMAILS): always a super admin" : undefined}
+          className="inline-flex h-8 w-32 items-center justify-between gap-1 rounded-md border border-grid px-2.5 text-sm transition hover:bg-hover disabled:cursor-default disabled:hover:bg-transparent"
+          aria-label={`Role: ${roleLabel(u.role)}`}
         >
-          {u.role === "admin" && <Shield className="size-3.5 text-primary" />}
-          <span className="flex-1 text-left">{u.role}</span>
-          <ChevronDown className="size-3.5 text-muted" />
+          {u.role !== "user" && <Shield className={cn("size-3.5", u.role === "super_admin" ? "text-[#a25ddc]" : "text-primary")} />}
+          <span className="flex-1 truncate text-left">{roleLabel(u.role)}</span>
+          {!locked && <ChevronDown className="size-3.5 text-muted" />}
         </button>
       </MenuTrigger>
-      <MenuContent align="end">
+      <MenuContent align="end" className="w-72">
         <MenuLabel>Role</MenuLabel>
-        {(["member", "admin"] as const).map((r) => (
+        {APP_ROLES.map((r) => (
           <MenuItem
-            key={r}
-            icon={r === u.role ? <Check /> : <span />}
-            onSelect={() =>
-              r !== u.role &&
-              act(
-                () => setRole({ id: u.id, role: r }),
-                `${u.name ?? u.email} is now ${r === "admin" ? "an admin" : "a member"}.`,
-              )
-            }
+            key={r.id}
+            icon={r.id === u.role ? <Check /> : <span />}
+            onSelect={() => r.id !== u.role && act(() => setRole({ id: u.id, role: r.id }), `${u.name ?? u.email} is now ${r.label}.`)}
           >
-            <span className="flex-1 capitalize">{r}</span>
-            <span className="text-xs text-muted">
-              {r === "admin" ? "Can manage people" : "Boards and tasks"}
+            <span className="flex-1">
+              <span className="block">{r.label}</span>
+              <span className="block text-xs text-muted">{r.text}</span>
             </span>
           </MenuItem>
         ))}
@@ -485,10 +484,14 @@ function RowActions({
   member: TeamMember;
   isMe: boolean;
 }) {
+  const actorRole = use(ActorRole);
   const [confirming, setConfirming] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const name = u.name ?? u.email;
+
+  // Admins manage only Users; owners can't be removed or deleted here.
+  if (!canManagePerson(actorRole, u) || u.isOwner) return <span className="w-8" />;
 
   if (confirming) {
     return (

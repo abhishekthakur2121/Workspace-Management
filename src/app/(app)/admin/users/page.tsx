@@ -14,7 +14,7 @@ export default async function ManageUsersPage() {
   return (
     <>
       <PageHeader title="Manage users" subtitle="Who can sign in, and who can manage the team." />
-      <TeamManager team={team} currentUserId={me.id} />
+      <TeamManager team={team} currentUserId={me.id} actorRole={me.role} />
       <div className="px-6 pb-10">
         <DataCleanup canClean={isOwner(me.email)} />
       </div>

@@ -15,10 +15,21 @@ A free, self-hosted work-management tool for a small agency (up to ~20 internal 
 - Removing a person signs them out immediately (database sessions); their work stays, shown greyed out. Admins can also delete a person permanently: their work stays, attributed to "Deleted user".
 
 **Access**
-- **Super admins** manage people and can see and do everything. They decide who else may **create workspaces**.
-- A workspace is visible only to its **members**. Its creator becomes a **workspace admin**: full rights on every board in it, and they manage its members (admin or member, and who may create boards).
-- A board is shared with **everyone in the workspace** or **only selected people** (workspace admins and the board's creator always have access). Anyone who can see a board can edit its tasks.
-- Tasks can only be assigned to people who can see the board; My work and Home only show boards you can access. All checks run on the server.
+
+| App role | Can do |
+|---|---|
+| **Super admin** (everyone in `INITIAL_ADMIN_EMAILS`, plus anyone promoted) | Everything: every workspace and board, all people, data clean-up (owners only) |
+| **Admin** | Creates workspaces; manages people with the User role. Sees only workspaces they're a member of |
+| **User** | Works in the workspaces they're added to |
+
+| Workspace role | Can do |
+|---|---|
+| **Admin** (the creator by default) | Everything in the workspace, including every board; manages members and their roles |
+| **Editor** | Creates boards; renames, shares and deletes the boards they created |
+| **Member** | Edits tasks on boards they can see |
+
+- A workspace is visible only to its members. A board is visible to **everyone in the workspace** or **only selected people**, chosen when it's created and changeable with **Share** (workspace admins and the creator always have access). Anyone who can see a board can edit its tasks.
+- Tasks can only be assigned to people who can see the board. All checks run on the server (`src/server/access.ts`).
 
 **How work is organised**
 - **Workspace:** e.g. one per client, or any grouping you like.

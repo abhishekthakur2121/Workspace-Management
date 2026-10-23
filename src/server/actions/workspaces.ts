@@ -5,13 +5,15 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { requireUser } from "@/server/auth-guard";
 import { positionAfter, positionBetween } from "@/server/positions";
-import { AccessError, assertWorkspaceAdmin, canCreateWorkspace } from "@/server/access";
+import { AccessError, assertWorkspaceAdmin, canCreateBoard, canCreateWorkspace } from "@/server/access";
 import { PALETTE } from "@/lib/utils";
 
 const id = z.string().min(1);
 const name = z.string().trim().min(1, "Name is required").max(80);
 
 type Result = { ok: true } | { error: string };
+type WorkspaceRole = "admin" | "editor" | "member";
+const workspaceRole = z.enum(["admin", "editor", "member"]);
 
 // The creator becomes the workspace's admin; memberIds join as members.
 export async function createWorkspace(input: { name: string; memberIds?: string[] }) {
@@ -119,7 +121,7 @@ export async function getWorkspaceMembers(input: { workspaceId: string }) {
     db.workspaceMember.findMany({
       where: { workspaceId },
       orderBy: [{ role: "asc" }, { createdAt: "asc" }],
-      select: { userId: true, role: true, canCreateBoards: true, user: { select: { name: true, email: true, image: true, active: true } } },
+      select: { userId: true, role: true, user: { select: { name: true, email: true, image: true, active: true } } },
     }),
     db.user.findMany({ where: { active: true }, orderBy: [{ name: "asc" }, { email: "asc" }], select: { id: true, name: true, email: true, image: true } }),
   ]);
@@ -129,36 +131,29 @@ export async function getWorkspaceMembers(input: { workspaceId: string }) {
 const otherWorkspaceAdmins = (workspaceId: string, exceptUserId: string) =>
   db.workspaceMember.count({ where: { workspaceId, role: "admin", userId: { not: exceptUserId } } });
 
-export async function addWorkspaceMembers(input: { workspaceId: string; userIds: string[] }): Promise<Result> {
+export async function addWorkspaceMembers(input: { workspaceId: string; userIds: string[]; role?: WorkspaceRole }): Promise<Result> {
   const user = await requireUser();
-  const data = z.object({ workspaceId: id, userIds: z.array(id).min(1).max(200) }).parse(input);
+  const data = z.object({ workspaceId: id, userIds: z.array(id).min(1).max(200), role: workspaceRole.default("member") }).parse(input);
   await assertWorkspaceAdmin(user, data.workspaceId);
   const people = await db.user.findMany({ where: { id: { in: data.userIds }, active: true }, select: { id: true } });
   await db.workspaceMember.createMany({
-    data: people.map((p) => ({ workspaceId: data.workspaceId, userId: p.id, role: "member" as const })),
+    data: people.map((p) => ({ workspaceId: data.workspaceId, userId: p.id, role: data.role })),
     skipDuplicates: true,
   });
   refresh();
   return { ok: true };
 }
 
-export async function updateWorkspaceMember(input: {
-  workspaceId: string;
-  userId: string;
-  role?: "admin" | "member";
-  canCreateBoards?: boolean;
-}): Promise<Result> {
+export async function updateWorkspaceMember(input: { workspaceId: string; userId: string; role: WorkspaceRole }): Promise<Result> {
   const user = await requireUser();
-  const data = z
-    .object({ workspaceId: id, userId: id, role: z.enum(["admin", "member"]).optional(), canCreateBoards: z.boolean().optional() })
-    .parse(input);
+  const data = z.object({ workspaceId: id, userId: id, role: workspaceRole }).parse(input);
   await assertWorkspaceAdmin(user, data.workspaceId);
-  if (data.role === "member" && (await otherWorkspaceAdmins(data.workspaceId, data.userId)) === 0) {
+  if (data.role !== "admin" && (await otherWorkspaceAdmins(data.workspaceId, data.userId)) === 0) {
     return { error: "A workspace needs at least one admin. Make someone else an admin first." };
   }
   await db.workspaceMember.update({
     where: { workspaceId_userId: { workspaceId: data.workspaceId, userId: data.userId } },
-    data: { role: data.role, canCreateBoards: data.canCreateBoards },
+    data: { role: data.role },
   });
   refresh();
   return { ok: true };
@@ -185,4 +180,17 @@ export async function removeWorkspaceMember(input: { workspaceId: string; userId
   ]);
   refresh();
   return { ok: true };
+}
+
+// Workspace members, for choosing who can see a new board.
+export async function listWorkspacePeople(input: { workspaceId: string }) {
+  const user = await requireUser();
+  const { workspaceId } = z.object({ workspaceId: id }).parse(input);
+  if (!(await canCreateBoard(user, workspaceId))) throw new AccessError();
+  const members = await db.workspaceMember.findMany({
+    where: { workspaceId, user: { active: true } },
+    orderBy: [{ role: "asc" }, { createdAt: "asc" }],
+    select: { userId: true, role: true, user: { select: { name: true, email: true, image: true } } },
+  });
+  return members.map((m) => ({ id: m.userId, role: m.role, ...m.user }));
 }

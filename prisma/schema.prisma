@@ -11,9 +11,14 @@ datasource db {
 // A User row is the allowlist entry: admins create it with an email + role
 // before the person ever signs in. Sign-in is refused without an active row.
 
+// App-wide role. Owners (INITIAL_ADMIN_EMAILS) are always super admins.
+//   super_admin  everything: every workspace, all people, data clean-up
+//   admin        creates workspaces, manages Users (not admins/super admins)
+//   user         works only inside workspaces they're added to
 enum Role {
+  super_admin
   admin
-  member
+  user
 }
 
 model User {
@@ -22,7 +27,7 @@ model User {
   name          String?
   image         String?
   emailVerified DateTime?
-  role          Role      @default(member)
+  role          Role      @default(user)
   active        Boolean   @default(true)
 
   // Optional email + password sign-in (admins create these; never self sign-up).
@@ -33,11 +38,8 @@ model User {
   failedLogins       Int       @default(0)
   lockedUntil        DateTime? // brute-force lockout
 
-  // Access: super admins (role = admin) can do everything; others need this
-  // flag to create workspaces.
-  canCreateWorkspaces Boolean  @default(false)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   accounts Account[]
   sessions Session[]
@@ -133,17 +135,21 @@ model Workspace {
 // do everything inside it, including on every board; members see boards
 // shared with them and can edit their tasks.
 
+// Role inside one workspace.
+//   admin   everything in the workspace, every board, manages members
+//   editor  creates boards; manages the boards they created
+//   member  edits tasks on boards they can see
 enum WorkspaceRole {
   admin
+  editor
   member
 }
 
 model WorkspaceMember {
-  workspaceId     String
-  userId          String
-  role            WorkspaceRole @default(member)
-  canCreateBoards Boolean       @default(false) // workspace admins always can
-  createdAt       DateTime      @default(now())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(member)
+  createdAt   DateTime      @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
