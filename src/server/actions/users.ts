@@ -129,3 +129,12 @@ export async function deleteUserPermanently(input: { id: string }): Promise<Resu
   refresh();
   return { ok: true };
 }
+
+// Super admins decide who besides themselves may create workspaces.
+export async function setCanCreateWorkspaces(input: { id: string; value: boolean }): Promise<Result> {
+  await requireAdmin();
+  const data = z.object({ id, value: z.boolean() }).parse(input);
+  await db.user.update({ where: { id: data.id }, data: { canCreateWorkspaces: data.value } });
+  refresh();
+  return { ok: true };
+}

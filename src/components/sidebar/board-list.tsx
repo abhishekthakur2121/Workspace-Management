@@ -20,7 +20,7 @@ import {
 } from "@dnd-kit/sortable";
 import { ownEventsOnly, restrictToVerticalAxis } from "@/lib/dnd";
 import { CSS } from "@dnd-kit/utilities";
-import { LayoutGrid, MoreHorizontal } from "lucide-react";
+import { LayoutGrid, Lock, MoreHorizontal } from "lucide-react";
 import { BoardMenu } from "@/components/board-menu";
 import { reorderBoard } from "@/server/actions/boards";
 import type { NavBoard } from "@/server/queries/nav";
@@ -85,7 +85,7 @@ export function BoardList({
 }
 
 function SortableBoard({ board, active, isFavorite }: { board: NavBoard; active: boolean; isFavorite: boolean }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: board.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: board.id, disabled: !board.canManage }); // only managers may reorder
 
   return (
     <li
@@ -114,6 +114,7 @@ export function BoardLink({ board, active, isFavorite }: { board: NavBoard; acti
       <Link href={`/b/${board.id}`} className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5" draggable={false}>
         <LayoutGrid className={cn("size-4 shrink-0", active ? "text-primary" : "text-muted")} />
         <span className="truncate">{board.name}</span>
+        {board.visibility === "private" && <Lock aria-label="Private board" className="size-3 shrink-0 text-muted" />}
       </Link>
       <BoardMenu board={board} isFavorite={isFavorite}>
         <button

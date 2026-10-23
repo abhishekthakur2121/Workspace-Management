@@ -12,12 +12,15 @@ const displayName = (p: Person) => p.name ?? p.email;
 
 export function PeoplePicker({
   people,
+  allowedIds,
   value,
   multiple,
   onChange,
   children,
 }: {
   people: Person[];
+  // Only these people can be picked (those who can see the board).
+  allowedIds?: string[];
   value: string[];
   multiple: boolean;
   onChange: (ids: string[]) => void;
@@ -28,7 +31,7 @@ export function PeoplePicker({
   const selected = value.map((id) => people.find((p) => p.id === id)).filter((p) => p !== undefined);
   const q = query.trim().toLowerCase();
   const options = people.filter(
-    (p) => p.active && !value.includes(p.id) && (!q || displayName(p).toLowerCase().includes(q) || p.email.toLowerCase().includes(q)),
+    (p) => p.active && (!allowedIds || allowedIds.includes(p.id)) && !value.includes(p.id) && (!q || displayName(p).toLowerCase().includes(q) || p.email.toLowerCase().includes(q)),
   );
 
   return (

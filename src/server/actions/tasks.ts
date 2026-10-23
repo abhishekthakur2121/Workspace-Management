@@ -10,6 +10,7 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { requireUser } from "@/server/auth-guard";
+import { assertCanSeeBoard, assertCanSeeTasks } from "@/server/access";
 import { positionAfter, positionBetween } from "@/server/positions";
 import { assertRefs } from "@/server/tasks/refs";
 import { endOfGroup, endOfStatusColumn, startOfGroup } from "@/server/tasks/ordering";
@@ -37,6 +38,7 @@ export async function createTask(input: {
       at: z.enum(["top", "bottom"]).default("bottom"),
     })
     .parse(input);
+  await assertCanSeeBoard(user, data.boardId);
 
   const parent = data.parentId
     ? await db.task.findFirstOrThrow({
@@ -84,6 +86,7 @@ export async function createTask(input: {
 export async function updateTask(input: { id: string; patch: TaskPatch }) {
   const user = await requireUser();
   const data = z.object({ id, patch: patchSchema }).parse(input);
+  await assertCanSeeTasks(user, [data.id]);
   const writes = await planPatch(data.id, data.patch, user.id);
   if (writes.length) await db.$transaction(writes);
   refresh();
@@ -93,6 +96,7 @@ export async function updateTask(input: { id: string; patch: TaskPatch }) {
 export async function bulkUpdateTasks(input: { ids: string[]; patch: TaskPatch; groupId?: string }) {
   const user = await requireUser();
   const data = z.object({ ids: z.array(id).min(1).max(500), patch: patchSchema, groupId: id.optional() }).parse(input);
+  await assertCanSeeTasks(user, data.ids);
   const plans = await Promise.all(
     data.ids.map(async (taskId) => [
       ...(await planPatch(taskId, data.patch, user.id)),
@@ -109,6 +113,7 @@ export async function bulkUpdateTasks(input: { ids: string[]; patch: TaskPatch; 
 export async function moveTask(input: { id: string; groupId: string; prevId?: string | null; nextId?: string | null }) {
   const user = await requireUser();
   const data = z.object({ id, groupId: id, prevId: id.nullish(), nextId: id.nullish() }).parse(input);
+  await assertCanSeeTasks(user, [data.id]);
   const neighbours = await db.task.findMany({
     where: { id: { in: [data.prevId, data.nextId].filter((x): x is string => !!x) }, groupId: data.groupId },
     select: { id: true, position: true },
@@ -137,6 +142,7 @@ async function setDeleted(ids: string[], deleted: boolean, actorId: string) {
 export async function deleteTasks(input: { ids: string[] }) {
   const user = await requireUser();
   const data = z.object({ ids: z.array(id).min(1).max(500) }).parse(input);
+  await assertCanSeeTasks(user, data.ids);
   await setDeleted(data.ids, true, user.id);
   refresh();
 }
@@ -144,6 +150,7 @@ export async function deleteTasks(input: { ids: string[] }) {
 export async function restoreTasks(input: { ids: string[] }) {
   const user = await requireUser();
   const data = z.object({ ids: z.array(id).min(1).max(500) }).parse(input);
+  await assertCanSeeTasks(user, data.ids);
   await setDeleted(data.ids, false, user.id);
   refresh();
 }
@@ -153,6 +160,7 @@ export async function restoreTasks(input: { ids: string[] }) {
 export async function moveTaskKanban(input: { id: string; statusId: string | null; prevId?: string | null; nextId?: string | null }) {
   const user = await requireUser();
   const data = z.object({ id, statusId: id.nullable(), prevId: id.nullish(), nextId: id.nullish() }).parse(input);
+  await assertCanSeeTasks(user, [data.id]);
   const [neighbours, statusWrites] = await Promise.all([
     db.task.findMany({
       where: { id: { in: [data.prevId, data.nextId].filter((x): x is string => !!x) } },

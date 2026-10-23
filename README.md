@@ -14,6 +14,12 @@ A free, self-hosted work-management tool for a small agency (up to ~20 internal 
 - After choosing a password, people can optionally add their name and a profile photo (also under **Profile** in the user menu).
 - Removing a person signs them out immediately (database sessions); their work stays, shown greyed out. Admins can also delete a person permanently: their work stays, attributed to "Deleted user".
 
+**Access**
+- **Super admins** manage people and can see and do everything. They decide who else may **create workspaces**.
+- A workspace is visible only to its **members**. Its creator becomes a **workspace admin**: full rights on every board in it, and they manage its members (admin or member, and who may create boards).
+- A board is shared with **everyone in the workspace** or **only selected people** (workspace admins and the board's creator always have access). Anyone who can see a board can edit its tasks.
+- Tasks can only be assigned to people who can see the board; My work and Home only show boards you can access. All checks run on the server.
+
 **How work is organised**
 - **Workspace:** e.g. one per client, or any grouping you like.
 - **Board:** a stream of work inside a workspace (e.g. "Digital Operations").

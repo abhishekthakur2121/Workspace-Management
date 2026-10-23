@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Switch } from "@/components/access/workspace-members-dialog";
 import {
   MIN_PASSWORD_LENGTH,
   PasswordChoiceField,
@@ -38,6 +39,7 @@ import {
   deleteUserPermanently,
   reactivateUser,
   resetPassword,
+  setCanCreateWorkspaces,
   setRole,
 } from "@/server/actions/users";
 import type { TeamMember } from "@/server/queries/users";
@@ -417,6 +419,20 @@ function MemberRow({ member: u, isMe }: { member: TeamMember; isMe: boolean }) {
       >
         {status}
       </span>
+      <label
+        className={cn("hidden items-center gap-2 text-xs lg:inline-flex", u.role === "admin" || !u.active ? "text-muted" : "cursor-pointer")}
+        title={u.role === "admin" ? "Super admins can always create workspaces" : undefined}
+      >
+        <Switch
+          checked={u.canCreateWorkspaces}
+          disabled={u.role === "admin" || !u.active}
+          onChange={(on) =>
+            act(() => setCanCreateWorkspaces({ id: u.id, value: on }), on ? `${u.name ?? u.email} can now create workspaces.` : `${u.name ?? u.email} can no longer create workspaces.`)
+          }
+          label={`${u.name ?? u.email} can create workspaces`}
+        />
+        Creates workspaces
+      </label>
       <RoleMenu member={u} />
       <RowActions member={u} isMe={isMe} />
     </li>

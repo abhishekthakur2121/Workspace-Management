@@ -1,8 +1,12 @@
 import "server-only";
 import { db } from "@/server/db";
 import type { Priority } from "@/generated/prisma/client";
+import { boardAccess, boardAudience, type Actor } from "@/server/access";
 
-export async function getBoardData(boardId: string) {
+// Returns null when the board doesn't exist or this person can't see it.
+export async function getBoardData(boardId: string, user: Actor) {
+  const access = await boardAccess(user, boardId);
+  if (!access.canSee) return null;
   const board = await db.board.findFirst({
     where: { id: boardId, deletedAt: null, workspace: { deletedAt: null } },
     select: {
@@ -10,6 +14,9 @@ export async function getBoardData(boardId: string) {
       name: true,
       workspaceId: true,
       updatedAt: true,
+      visibility: true,
+      createdById: true,
+      members: { select: { userId: true } },
       workspace: { select: { id: true, name: true, color: true } },
       groups: {
         where: { deletedAt: null },
@@ -25,7 +32,7 @@ export async function getBoardData(boardId: string) {
   });
   if (!board) return null;
 
-  const [tasks, users] = await Promise.all([
+  const [tasks, users, audience] = await Promise.all([
     db.task.findMany({
       where: { boardId, deletedAt: null, group: { deletedAt: null }, OR: [{ parentId: null }, { parent: { deletedAt: null } }] },
       orderBy: { position: "asc" },
@@ -50,6 +57,7 @@ export async function getBoardData(boardId: string) {
       orderBy: [{ active: "desc" }, { name: "asc" }],
       select: { id: true, name: true, email: true, image: true, active: true },
     }),
+    boardAudience(boardId),
   ]);
 
   const rows: TaskRow[] = tasks.map((t) => ({
@@ -68,8 +76,17 @@ export async function getBoardData(boardId: string) {
     commentCount: t._count.comments,
   }));
 
-  const { updatedAt, ...rest } = board;
-  return { ...rest, tasks: rows, users, version: boardVersion(updatedAt, tasks) };
+  const { updatedAt, members, ...rest } = board;
+  return {
+    ...rest,
+    sharedWith: members.map((m) => m.userId),
+    canManage: access.canManage,
+    // People who can see this board: the only ones pickers offer for assignment.
+    audience,
+    tasks: rows,
+    users,
+    version: boardVersion(updatedAt, tasks),
+  };
 }
 
 // Changes whenever anything on the board changes: label/group/tag edits bump

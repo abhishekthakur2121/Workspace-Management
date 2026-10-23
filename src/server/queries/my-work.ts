@@ -1,14 +1,16 @@
 import "server-only";
 import { db } from "@/server/db";
+import { visibleBoardWhere, type Actor } from "@/server/access";
 
 // Every live task or subtask where the user is accountable or responsible,
-// across all workspaces, soonest due first (no date last).
-export async function getMyWork(userId: string) {
+// on boards they can still see, soonest due first (no date last).
+export async function getMyWork(user: Actor) {
+  const userId = user.id;
   const tasks = await db.task.findMany({
     where: {
       deletedAt: null,
       group: { deletedAt: null },
-      board: { deletedAt: null, workspace: { deletedAt: null } },
+      board: { deletedAt: null, workspace: { deletedAt: null }, ...visibleBoardWhere(user) },
       AND: [
         { OR: [{ parentId: null }, { parent: { deletedAt: null } }] },
         { OR: [{ accountableId: userId }, { responsible: { some: { userId } } }] },

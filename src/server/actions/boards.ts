@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { requireUser } from "@/server/auth-guard";
 import { positionAfter, positionBetween, positionsFromStart } from "@/server/positions";
+import { AccessError, assertCanManageBoard, assertCanSeeBoard, canCreateBoard } from "@/server/access";
 
 const id = z.string().min(1);
 const name = z.string().trim().min(1, "Name is required").max(80);
@@ -22,8 +23,11 @@ const DEFAULT_GROUPS = [
 ];
 
 export async function createBoard(input: { workspaceId: string; name: string }) {
-  await requireUser();
+  const user = await requireUser();
   const data = z.object({ workspaceId: id, name }).parse(input);
+  if (!(await canCreateBoard(user, data.workspaceId))) {
+    throw new AccessError("You don't have permission to create boards in this workspace.");
+  }
 
   const last = await db.board.findFirst({
     where: { workspaceId: data.workspaceId },
@@ -33,11 +37,13 @@ export async function createBoard(input: { workspaceId: string; name: string }) 
   const statusKeys = positionsFromStart(DEFAULT_STATUSES.length);
   const groupKeys = positionsFromStart(DEFAULT_GROUPS.length);
 
+  // New boards are visible to the whole workspace; the creator can narrow it.
   const board = await db.board.create({
     data: {
       workspaceId: data.workspaceId,
       name: data.name,
       position: positionAfter(last?.position),
+      createdById: user.id,
       statuses: { create: DEFAULT_STATUSES.map((s, i) => ({ ...s, position: statusKeys[i] })) },
       groups: { create: DEFAULT_GROUPS.map((g, i) => ({ ...g, position: groupKeys[i] })) },
     },
@@ -48,16 +54,18 @@ export async function createBoard(input: { workspaceId: string; name: string }) 
 }
 
 export async function renameBoard(input: { id: string; name: string }) {
-  await requireUser();
+  const user = await requireUser();
   const data = z.object({ id, name }).parse(input);
+  await assertCanManageBoard(user, data.id);
   await db.board.update({ where: { id: data.id }, data: { name: data.name } });
   refresh();
 }
 
 // Moves a board between two neighbours (either may be absent at the ends).
 export async function reorderBoard(input: { id: string; prevId?: string | null; nextId?: string | null }) {
-  await requireUser();
+  const user = await requireUser();
   const data = z.object({ id, prevId: id.nullish(), nextId: id.nullish() }).parse(input);
+  await assertCanManageBoard(user, data.id);
 
   const neighbours = await db.board.findMany({
     where: { id: { in: [data.prevId, data.nextId].filter((x): x is string => !!x) } },
@@ -70,15 +78,17 @@ export async function reorderBoard(input: { id: string; prevId?: string | null; 
 }
 
 export async function deleteBoard(input: { id: string }) {
-  await requireUser();
+  const user = await requireUser();
   const data = z.object({ id }).parse(input);
+  await assertCanManageBoard(user, data.id);
   await db.board.update({ where: { id: data.id }, data: { deletedAt: new Date() } });
   refresh();
 }
 
 export async function restoreBoard(input: { id: string }) {
-  await requireUser();
+  const user = await requireUser();
   const data = z.object({ id }).parse(input);
+  await assertCanManageBoard(user, data.id);
   await db.board.update({ where: { id: data.id }, data: { deletedAt: null } });
   refresh();
 }
@@ -86,6 +96,7 @@ export async function restoreBoard(input: { id: string }) {
 export async function toggleFavorite(input: { boardId: string }) {
   const user = await requireUser();
   const data = z.object({ boardId: id }).parse(input);
+  await assertCanSeeBoard(user, data.boardId);
   const key = { userId_boardId: { userId: user.id, boardId: data.boardId } };
 
   const existing = await db.favorite.findUnique({ where: key });
@@ -93,4 +104,53 @@ export async function toggleFavorite(input: { boardId: string }) {
   else await db.favorite.create({ data: { userId: user.id, boardId: data.boardId } });
   refresh();
   return { favorite: !existing };
+}
+
+// Board sharing: the whole workspace, or only selected workspace members
+// (workspace admins and the creator always see it).
+export async function setBoardAccess(input: {
+  boardId: string;
+  visibility: "workspace" | "private";
+  userIds: string[];
+}): Promise<{ ok: true } | { error: string }> {
+  const user = await requireUser();
+  const data = z
+    .object({ boardId: id, visibility: z.enum(["workspace", "private"]), userIds: z.array(id).max(500) })
+    .parse(input);
+  await assertCanManageBoard(user, data.boardId);
+  const board = await db.board.findUniqueOrThrow({ where: { id: data.boardId }, select: { workspaceId: true } });
+  // Only people in the workspace can be given access.
+  const members = await db.workspaceMember.findMany({
+    where: { workspaceId: board.workspaceId, userId: { in: data.userIds } },
+    select: { userId: true },
+  });
+  await db.$transaction([
+    db.board.update({ where: { id: data.boardId }, data: { visibility: data.visibility, updatedAt: new Date() } }),
+    db.boardMember.deleteMany({ where: { boardId: data.boardId } }),
+    db.boardMember.createMany({ data: members.map((m) => ({ boardId: data.boardId, userId: m.userId })) }),
+  ]);
+  refresh();
+  return { ok: true };
+}
+
+// The workspace's members, for the board's Share dialog.
+export async function getBoardSharing(input: { boardId: string }) {
+  const user = await requireUser();
+  const { boardId } = z.object({ boardId: id }).parse(input);
+  await assertCanManageBoard(user, boardId);
+  const board = await db.board.findUniqueOrThrow({
+    where: { id: boardId },
+    select: { workspaceId: true, visibility: true, createdById: true, members: { select: { userId: true } } },
+  });
+  const members = await db.workspaceMember.findMany({
+    where: { workspaceId: board.workspaceId, user: { active: true } },
+    orderBy: [{ role: "asc" }, { createdAt: "asc" }],
+    select: { userId: true, role: true, user: { select: { name: true, email: true, image: true } } },
+  });
+  return {
+    visibility: board.visibility,
+    createdById: board.createdById,
+    sharedWith: board.members.map((m) => m.userId),
+    members,
+  };
 }

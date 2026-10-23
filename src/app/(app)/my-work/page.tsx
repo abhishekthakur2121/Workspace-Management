@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "My work" };
 
 export default async function MyWorkPage() {
   const user = await requireUser();
-  const tasks = await getMyWork(user.id);
+  const tasks = await getMyWork(user);
 
   return (
     <>

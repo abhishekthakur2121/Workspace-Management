@@ -30,7 +30,7 @@ export function BulkBar({ ids, onClear }: { ids: string[]; onClear: () => void }
         </PopoverTrigger>
       </StatusPicker>
 
-      <PeoplePicker people={board.users} value={[]} multiple={false} onChange={(next) => bulkUpdate(ids, { accountableId: next[0] ?? null })}>
+      <PeoplePicker people={board.users} allowedIds={board.audience} value={[]} multiple={false} onChange={(next) => bulkUpdate(ids, { accountableId: next[0] ?? null })}>
         <PopoverTrigger asChild>
           <button className={action}>
             <span className="size-3.5 rounded-full bg-primary" />

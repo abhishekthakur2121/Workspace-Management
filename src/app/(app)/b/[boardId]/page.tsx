@@ -9,7 +9,7 @@ import { BoardView } from "@/components/board/board-view";
 export default async function BoardPage({ params }: PageProps<"/b/[boardId]">) {
   const { boardId } = await params;
   const user = await requireUser();
-  const [board, nav] = await Promise.all([getBoardData(boardId), getNavData(user.id)]);
+  const [board, nav] = await Promise.all([getBoardData(boardId, user), getNavData(user)]);
   if (!board) notFound();
 
   // Feeds "Recently visited" on Home; runs after the response is sent.

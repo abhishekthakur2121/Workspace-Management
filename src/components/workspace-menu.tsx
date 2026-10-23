@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, Check, Pencil, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Pencil, Trash2, Users } from "lucide-react";
+import { WorkspaceMembersDialog } from "@/components/access/workspace-members-dialog";
 import { toast } from "sonner";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { ConfirmDeleteDialog, NameDialog } from "@/components/dialogs";
@@ -17,6 +18,7 @@ import { PALETTE } from "@/lib/utils";
 
 type Workspace = { id: string; name: string; color: string; boards: { id: string }[] };
 
+// Only rendered for workspace admins (and super admins).
 export function WorkspaceMenu({
   workspace,
   isFirst,
@@ -34,6 +36,7 @@ export function WorkspaceMenu({
   const pathname = usePathname();
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
 
   async function remove() {
     await deleteWorkspace({ id: workspace.id });
@@ -50,6 +53,9 @@ export function WorkspaceMenu({
       <Menu>
         <MenuTrigger asChild>{children}</MenuTrigger>
         <MenuContent align={align}>
+          <MenuItem icon={<Users />} onSelect={() => setMembersOpen(true)}>
+            Members…
+          </MenuItem>
           <MenuItem icon={<Pencil />} onSelect={() => setRenaming(true)}>
             Rename workspace
           </MenuItem>
@@ -97,6 +103,7 @@ export function WorkspaceMenu({
         extra={`and its ${workspace.boards.length} board${workspace.boards.length === 1 ? "" : "s"} will be deleted.`}
         onConfirm={remove}
       />
+      <WorkspaceMembersDialog workspaceId={workspace.id} workspaceName={workspace.name} open={membersOpen} onOpenChange={setMembersOpen} />
     </>
   );
 }

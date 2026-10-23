@@ -312,6 +312,7 @@ function Card({ task, hidden, overlay }: { task: TaskRow; hidden: ColumnKey[]; o
           <span>
             <PeoplePicker
               people={board.users}
+              allowedIds={board.audience}
               value={task.responsibleIds}
               multiple
               onChange={(responsibleIds) => update(task.id, { responsibleIds })}

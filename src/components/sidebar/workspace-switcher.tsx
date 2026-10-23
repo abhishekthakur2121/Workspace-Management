@@ -13,9 +13,11 @@ import { cn } from "@/lib/utils";
 export function WorkspaceSwitcher({
   workspaces,
   current,
+  canCreateWorkspaces,
 }: {
   workspaces: NavWorkspace[];
   current?: NavWorkspace;
+  canCreateWorkspaces: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -78,14 +80,16 @@ export function WorkspaceSwitcher({
                       <span className="flex-1 truncate">{w.name}</span>
                       {w.id === current?.id && <Check className="size-4 text-primary" />}
                     </button>
-                    <WorkspaceMenu workspace={w} isFirst={index === 0} isLast={index === workspaces.length - 1} align="end">
-                      <button
-                        aria-label={`${w.name} options`}
-                        className="mr-1 rounded p-1 text-muted opacity-0 group-hover:opacity-100 hover:bg-border/60 focus:opacity-100 data-[state=open]:opacity-100"
-                      >
-                        <MoreHorizontal className="size-4" />
-                      </button>
-                    </WorkspaceMenu>
+                    {w.isAdmin && (
+                      <WorkspaceMenu workspace={w} isFirst={index === 0} isLast={index === workspaces.length - 1} align="end">
+                        <button
+                          aria-label={`${w.name} options`}
+                          className="mr-1 rounded p-1 text-muted opacity-0 group-hover:opacity-100 hover:bg-border/60 focus:opacity-100 data-[state=open]:opacity-100"
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </button>
+                      </WorkspaceMenu>
+                    )}
                   </div>
                 );
               })}
@@ -95,17 +99,19 @@ export function WorkspaceSwitcher({
                 </p>
               )}
             </div>
-            <div className="mt-1 border-t border-border pt-1">
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  setCreating(true);
-                }}
-                className={cn("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-primary hover:bg-hover")}
-              >
-                <Plus className="size-4" /> Add workspace
-              </button>
-            </div>
+            {canCreateWorkspaces && (
+              <div className="mt-1 border-t border-border pt-1">
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    setCreating(true);
+                  }}
+                  className={cn("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-primary hover:bg-hover")}
+                >
+                  <Plus className="size-4" /> Add workspace
+                </button>
+              </div>
+            )}
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>

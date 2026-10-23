@@ -6,6 +6,7 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { requireUser } from "@/server/auth-guard";
+import { assertCanSeeTasks } from "@/server/access";
 import type { Prisma } from "@/generated/prisma/client";
 
 const id = z.string().min(1);
@@ -14,8 +15,9 @@ const body = z.string().trim().min(1, "Write something first").max(5000);
 const author = { select: { id: true, name: true, email: true, image: true, active: true } } as const;
 
 export async function loadTaskThread(input: { taskId: string }) {
-  await requireUser();
+  const user = await requireUser();
   const { taskId } = z.object({ taskId: id }).parse(input);
+  await assertCanSeeTasks(user, [taskId]);
   const [comments, activity] = await Promise.all([
     db.comment.findMany({
       where: { taskId, deletedAt: null },
@@ -51,6 +53,7 @@ const touchTask = (taskId: string) => db.task.update({ where: { id: taskId }, da
 export async function addComment(input: { taskId: string; body: string }) {
   const user = await requireUser();
   const data = z.object({ taskId: id, body }).parse(input);
+  await assertCanSeeTasks(user, [data.taskId]);
   await db.task.findFirstOrThrow({ where: { id: data.taskId, deletedAt: null }, select: { id: true } });
   const [comment] = await db.$transaction([
     db.comment.create({
@@ -70,6 +73,7 @@ async function ownComment(commentId: string, allowAdmin: boolean) {
     where: { id: commentId, deletedAt: null },
     select: { authorId: true, taskId: true },
   });
+  await assertCanSeeTasks(user, [comment.taskId]);
   const allowed = comment.authorId === user.id || (allowAdmin && user.role === "admin");
   if (!allowed) throw new Error("Not allowed");
   return comment;

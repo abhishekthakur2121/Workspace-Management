@@ -15,6 +15,7 @@ export async function getTeam() {
       createdAt: true,
       passwordHash: true,
       mustChangePassword: true,
+      canCreateWorkspaces: true,
       _count: { select: { accounts: true } },
       sessions: { orderBy: { updatedAt: "desc" }, take: 1, select: { updatedAt: true } },
     },
@@ -33,6 +34,7 @@ export async function getTeam() {
     hasSignedIn: u._count.accounts > 0 || (!!u.passwordHash && !u.mustChangePassword) || u.sessions.length > 0,
     hasPassword: !!u.passwordHash,
     mustChangePassword: u.mustChangePassword,
+    canCreateWorkspaces: u.role === "admin" || u.canCreateWorkspaces,
   }));
 }
 

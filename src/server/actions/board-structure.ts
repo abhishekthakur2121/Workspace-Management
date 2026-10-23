@@ -7,6 +7,7 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { requireUser } from "@/server/auth-guard";
+import { assertCanSeeBoard } from "@/server/access";
 import { positionAfter, positionBetween } from "@/server/positions";
 import { PALETTE } from "@/lib/utils";
 
@@ -14,13 +15,25 @@ const id = z.string().min(1);
 const label = z.string().trim().min(1).max(60);
 const color = z.string().regex(/^#[0-9a-f]{6}$/i);
 
+// Seeing a board means you can edit it, including its groups, labels and tags.
+async function boardOf(kind: "group" | "status" | "tag", id: string) {
+  const row =
+    kind === "group"
+      ? await db.group.findUniqueOrThrow({ where: { id }, select: { boardId: true } })
+      : kind === "status"
+        ? await db.statusLabel.findUniqueOrThrow({ where: { id }, select: { boardId: true } })
+        : await db.tag.findUniqueOrThrow({ where: { id }, select: { boardId: true } });
+  return row.boardId;
+}
+
 const touchBoard = (boardId: string) => db.board.update({ where: { id: boardId }, data: { updatedAt: new Date() } });
 
 // ─── groups ──────────────────────────────────────────────────────────────────
 
 export async function createGroup(input: { boardId: string; name?: string }) {
-  await requireUser();
+  const user = await requireUser();
   const data = z.object({ boardId: id, name: label.optional() }).parse(input);
+  await assertCanSeeBoard(user, data.boardId);
   const [first, count] = await Promise.all([
     db.group.findFirst({ where: { boardId: data.boardId, deletedAt: null }, orderBy: { position: "asc" }, select: { position: true } }),
     db.group.count({ where: { boardId: data.boardId } }),
@@ -41,16 +54,18 @@ export async function createGroup(input: { boardId: string; name?: string }) {
 }
 
 export async function updateGroup(input: { id: string; name?: string; color?: string }) {
-  await requireUser();
+  const user = await requireUser();
   const data = z.object({ id, name: label.optional(), color: color.optional() }).parse(input);
+  await assertCanSeeBoard(user, await boardOf("group", data.id));
   const group = await db.group.update({ where: { id: data.id }, data: { name: data.name, color: data.color }, select: { boardId: true } });
   await touchBoard(group.boardId);
   refresh();
 }
 
 export async function moveGroup(input: { id: string; direction: "up" | "down" }) {
-  await requireUser();
+  const user = await requireUser();
   const data = z.object({ id, direction: z.enum(["up", "down"]) }).parse(input);
+  await assertCanSeeBoard(user, await boardOf("group", data.id));
   const group = await db.group.findUniqueOrThrow({ where: { id: data.id }, select: { boardId: true } });
   const all = await db.group.findMany({
     where: { boardId: group.boardId, deletedAt: null },
@@ -70,16 +85,18 @@ export async function moveGroup(input: { id: string; direction: "up" | "down" })
 }
 
 export async function deleteGroup(input: { id: string }) {
-  await requireUser();
+  const user = await requireUser();
   const data = z.object({ id }).parse(input);
+  await assertCanSeeBoard(user, await boardOf("group", data.id));
   const group = await db.group.update({ where: { id: data.id }, data: { deletedAt: new Date() }, select: { boardId: true } });
   await touchBoard(group.boardId);
   refresh();
 }
 
 export async function restoreGroup(input: { id: string }) {
-  await requireUser();
+  const user = await requireUser();
   const data = z.object({ id }).parse(input);
+  await assertCanSeeBoard(user, await boardOf("group", data.id));
   const group = await db.group.update({ where: { id: data.id }, data: { deletedAt: null }, select: { boardId: true } });
   await touchBoard(group.boardId);
   refresh();
@@ -88,8 +105,9 @@ export async function restoreGroup(input: { id: string }) {
 // ─── status labels ───────────────────────────────────────────────────────────
 
 export async function createStatus(input: { boardId: string; name: string; color: string }) {
-  await requireUser();
+  const user = await requireUser();
   const data = z.object({ boardId: id, name: label, color }).parse(input);
+  await assertCanSeeBoard(user, data.boardId);
   const last = await db.statusLabel.findFirst({ where: { boardId: data.boardId }, orderBy: { position: "desc" }, select: { position: true } });
   const status = await db.statusLabel.create({
     data: { boardId: data.boardId, name: data.name, color: data.color, position: positionAfter(last?.position) },
@@ -101,8 +119,9 @@ export async function createStatus(input: { boardId: string; name: string; color
 }
 
 export async function updateStatus(input: { id: string; name?: string; color?: string; isDone?: boolean }) {
-  await requireUser();
+  const user = await requireUser();
   const data = z.object({ id, name: label.optional(), color: color.optional(), isDone: z.boolean().optional() }).parse(input);
+  await assertCanSeeBoard(user, await boardOf("status", data.id));
   const { id: statusId, ...patch } = data;
   const status = await db.statusLabel.update({ where: { id: statusId }, data: patch, select: { boardId: true } });
   await touchBoard(status.boardId);
@@ -111,8 +130,9 @@ export async function updateStatus(input: { id: string; name?: string; color?: s
 
 // Tasks with this status become "no status" (onDelete: SetNull).
 export async function deleteStatus(input: { id: string }) {
-  await requireUser();
+  const user = await requireUser();
   const data = z.object({ id }).parse(input);
+  await assertCanSeeBoard(user, await boardOf("status", data.id));
   const status = await db.statusLabel.delete({ where: { id: data.id }, select: { boardId: true } });
   await touchBoard(status.boardId);
   refresh();
@@ -121,8 +141,9 @@ export async function deleteStatus(input: { id: string }) {
 // ─── tags ────────────────────────────────────────────────────────────────────
 
 export async function createTag(input: { boardId: string; name: string }) {
-  await requireUser();
+  const user = await requireUser();
   const data = z.object({ boardId: id, name: label }).parse(input);
+  await assertCanSeeBoard(user, data.boardId);
   const existing = await db.tag.findFirst({
     where: { boardId: data.boardId, name: { equals: data.name, mode: "insensitive" } },
     select: { id: true, name: true, color: true },
@@ -139,8 +160,9 @@ export async function createTag(input: { boardId: string; name: string }) {
 }
 
 export async function deleteTag(input: { id: string }) {
-  await requireUser();
+  const user = await requireUser();
   const data = z.object({ id }).parse(input);
+  await assertCanSeeBoard(user, await boardOf("tag", data.id));
   const tag = await db.tag.delete({ where: { id: data.id }, select: { boardId: true } });
   await touchBoard(tag.boardId);
   refresh();

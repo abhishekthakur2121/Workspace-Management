@@ -133,20 +133,22 @@ function Sidebar({ user, nav, onClose }: { user: User; nav: NavData; onClose: ()
         <div className="mx-2 my-3 h-px bg-border" />
 
         <div className="px-1">
-          <WorkspaceSwitcher workspaces={nav.workspaces} current={current} />
+          <WorkspaceSwitcher workspaces={nav.workspaces} current={current} canCreateWorkspaces={nav.canCreateWorkspaces} />
         </div>
 
         {current && (
           <>
             <div className="mt-3 mb-1 flex items-center justify-between px-3">
               <span className="text-xs font-medium tracking-wide text-muted uppercase">Boards</span>
-              <button
-                aria-label="Add board"
-                onClick={() => setCreatingBoard(true)}
-                className="rounded p-1 text-muted hover:bg-hover hover:text-foreground"
-              >
-                <Plus className="size-4" />
-              </button>
+              {current.canCreateBoards && (
+                <button
+                  aria-label="Add board"
+                  onClick={() => setCreatingBoard(true)}
+                  className="rounded p-1 text-muted hover:bg-hover hover:text-foreground"
+                >
+                  <Plus className="size-4" />
+                </button>
+              )}
             </div>
             <BoardList boards={current.boards} favoriteIds={nav.favoriteBoardIds} activeBoardId={activeBoardId} />
             <CreateBoardDialog workspaceId={current.id} open={creatingBoard} onOpenChange={setCreatingBoard} />

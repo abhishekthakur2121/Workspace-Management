@@ -11,7 +11,7 @@ import { CreateWorkspaceButton } from "@/components/create-buttons";
 
 export default async function HomePage() {
   const user = await requireUser();
-  const [recent, nav, myWork] = await Promise.all([getRecentBoards(user.id), getNavData(user.id), getMyWork(user.id)]);
+  const [recent, nav, myWork] = await Promise.all([getRecentBoards(user), getNavData(user), getMyWork(user)]);
   const firstName = user.name?.split(" ")[0] ?? "there";
 
   return (
@@ -55,11 +55,13 @@ export default async function HomePage() {
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-semibold">Workspaces</h2>
-            <CreateWorkspaceButton>
-              <Button size="sm" variant="secondary">
-                <Plus className="size-4" /> New workspace
-              </Button>
-            </CreateWorkspaceButton>
+            {nav.canCreateWorkspaces && (
+              <CreateWorkspaceButton>
+                <Button size="sm" variant="secondary">
+                  <Plus className="size-4" /> New workspace
+                </Button>
+              </CreateWorkspaceButton>
+            )}
           </div>
           {nav.workspaces.length ? (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -81,13 +83,22 @@ export default async function HomePage() {
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border bg-surface p-8 text-center">
-              <p className="font-medium">No workspaces yet</p>
-              <p className="mt-1 text-sm text-muted">Create one for each client or team to get started.</p>
-              <CreateWorkspaceButton>
-                <Button className="mt-4">
-                  <Plus className="size-4" /> Create workspace
-                </Button>
-              </CreateWorkspaceButton>
+              {nav.canCreateWorkspaces ? (
+                <>
+                  <p className="font-medium">No workspaces yet</p>
+                  <p className="mt-1 text-sm text-muted">Create one for each client or team to get started.</p>
+                  <CreateWorkspaceButton>
+                    <Button className="mt-4">
+                      <Plus className="size-4" /> Create workspace
+                    </Button>
+                  </CreateWorkspaceButton>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium">You&apos;re not in any workspace yet</p>
+                  <p className="mt-1 text-sm text-muted">Ask a workspace admin to add you.</p>
+                </>
+              )}
             </div>
           )}
         </section>

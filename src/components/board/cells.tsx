@@ -55,6 +55,7 @@ export function PeopleCell({ task, field }: { task: TaskRow; field: "accountable
   return (
     <PeoplePicker
       people={board.users}
+      allowedIds={board.audience}
       value={ids}
       multiple={field === "responsible"}
       onChange={(next) =>

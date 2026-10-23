@@ -15,7 +15,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 async function AuthGate({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
-  const nav = await getNavData(user.id);
+  const nav = await getNavData(user);
 
   return (
     <AppShell user={user} nav={nav}>

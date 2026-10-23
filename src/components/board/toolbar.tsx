@@ -82,7 +82,7 @@ export function Toolbar(p: ToolbarProps) {
           <p className="mb-2 px-1 text-xs text-muted">Show tasks where this person is accountable or responsible</p>
           <div className="flex flex-wrap gap-1.5">
             {board.users
-              .filter((u) => u.active)
+              .filter((u) => u.active && board.audience.includes(u.id))
               .map((u) => (
                 <button
                   key={u.id}

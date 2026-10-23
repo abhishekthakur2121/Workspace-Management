@@ -32,8 +32,12 @@ model User {
   passwordUpdatedAt  DateTime?
   failedLogins       Int       @default(0)
   lockedUntil        DateTime? // brute-force lockout
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+
+  // Access: super admins (role = admin) can do everything; others need this
+  // flag to create workspaces.
+  canCreateWorkspaces Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   accounts Account[]
   sessions Session[]
@@ -46,6 +50,11 @@ model User {
   favorites        Favorite[]
   boardVisits      BoardVisit[]
   avatar           Avatar?
+
+  workspaceMemberships WorkspaceMember[]
+  boardMemberships     BoardMember[]
+  createdWorkspaces    Workspace[]       @relation("WorkspaceCreatedBy")
+  createdBoards        Board[]           @relation("BoardCreatedBy")
 }
 
 // Uploaded profile picture, kept out of the User row so loading a user (on
@@ -105,28 +114,76 @@ model VerificationToken {
 // `deletedAt` is a soft delete (undo toast); a scheduled job purges after 30 days.
 
 model Workspace {
-  id        String    @id @default(cuid())
-  name      String
-  color     String    @default("#579bfc")
-  position  String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  boards Board[]
-}
-
-model Board {
   id          String    @id @default(cuid())
-  workspaceId String
   name        String
-  description String?
+  color       String    @default("#579bfc")
   position    String
+  createdById String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
+  createdBy User?             @relation("WorkspaceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  boards    Board[]
+  members   WorkspaceMember[]
+}
+
+// ─── Access ─────────────────────────────────────────────────────────────────
+// Only members see a workspace (super admins see all). Workspace admins can
+// do everything inside it, including on every board; members see boards
+// shared with them and can edit their tasks.
+
+enum WorkspaceRole {
+  admin
+  member
+}
+
+model WorkspaceMember {
+  workspaceId     String
+  userId          String
+  role            WorkspaceRole @default(member)
+  canCreateBoards Boolean       @default(false) // workspace admins always can
+  createdAt       DateTime      @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, userId])
+  @@index([userId])
+}
+
+enum BoardVisibility {
+  workspace // everyone in the workspace
+  private // only BoardMember rows (plus the creator and workspace admins)
+}
+
+model BoardMember {
+  boardId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([boardId, userId])
+  @@index([userId])
+}
+
+model Board {
+  id          String          @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  position    String
+  visibility  BoardVisibility @default(workspace)
+  createdById String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  deletedAt   DateTime?
+
   workspace  Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy  User?         @relation("BoardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  members    BoardMember[]
   groups     Group[]
   statuses   StatusLabel[]
   tags       Tag[]

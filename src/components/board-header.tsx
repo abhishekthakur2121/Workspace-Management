@@ -2,7 +2,9 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { MoreHorizontal, Star } from "lucide-react";
+import { Lock, MoreHorizontal, Share2, Star } from "lucide-react";
+import { BoardShareDialog } from "@/components/access/board-share-dialog";
+import { Button } from "@/components/ui/button";
 import { BoardMenu } from "@/components/board-menu";
 import { WorkspaceIcon } from "@/components/ui/avatar";
 import { renameBoard, toggleFavorite } from "@/server/actions/boards";
@@ -13,10 +15,13 @@ type Board = {
   name: string;
   workspaceId: string;
   workspace: { id: string; name: string; color: string };
+  canManage: boolean;
+  visibility: "workspace" | "private";
 };
 
 export function BoardHeader({ board, isFavorite }: { board: Board; isFavorite: boolean }) {
   const [favorite, setFavorite] = useState(isFavorite);
+  const [sharing, setSharing] = useState(false);
   const [, startTransition] = useTransition();
 
   return (
@@ -29,7 +34,16 @@ export function BoardHeader({ board, isFavorite }: { board: Board; isFavorite: b
         {board.workspace.name}
       </Link>
       <div className="mt-1 flex items-center gap-1">
-        <EditableTitle key={board.name} value={board.name} onSave={(name) => renameBoard({ id: board.id, name })} />
+        {board.canManage ? (
+          <EditableTitle key={board.name} value={board.name} onSave={(name) => renameBoard({ id: board.id, name })} />
+        ) : (
+          <h1 className="truncate text-[26px] font-bold tracking-tight">{board.name}</h1>
+        )}
+        {board.visibility === "private" && (
+          <span title="Only selected people can see this board" className="ml-1 inline-flex items-center gap-1 rounded-full bg-hover px-2 py-0.5 text-xs text-muted">
+            <Lock className="size-3" /> Private
+          </span>
+        )}
         <button
           aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
           aria-pressed={favorite}
@@ -41,11 +55,25 @@ export function BoardHeader({ board, isFavorite }: { board: Board; isFavorite: b
         >
           <Star className={cn("size-5", favorite ? "fill-[#ffcb00] text-[#ffcb00]" : "text-muted")} />
         </button>
-        <BoardMenu board={board} isFavorite={favorite} align="start">
+        <BoardMenu board={board} workspaceName={board.workspace.name} isFavorite={favorite} align="start">
           <button aria-label="Board options" className="rounded-md p-1.5 text-muted hover:bg-hover">
             <MoreHorizontal className="size-5" />
           </button>
         </BoardMenu>
+        {board.canManage && (
+          <>
+            <Button variant="secondary" size="sm" className="ml-auto" onClick={() => setSharing(true)}>
+              <Share2 className="size-4" /> Share
+            </Button>
+            <BoardShareDialog
+              boardId={board.id}
+              boardName={board.name}
+              workspaceName={board.workspace.name}
+              open={sharing}
+              onOpenChange={setSharing}
+            />
+          </>
+        )}
       </div>
     </header>
   );
