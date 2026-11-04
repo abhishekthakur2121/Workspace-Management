@@ -16,6 +16,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except sign-in, auth/health APIs, Next internals and static files.
-  matcher: ["/((?!signin|api/auth|api/health|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  // Everything except sign-in, auth/health/cron APIs, Next internals and
+  // static files. The cron route checks its own secret.
+  matcher: ["/((?!signin|api/auth|api/health|api/cron|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };

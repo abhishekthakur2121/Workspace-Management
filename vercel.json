@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "if [ \"$VERCEL_ENV\" = production ]; then npx prisma migrate deploy; fi && npm run build",
+  "regions": ["cle1"],
+  "crons": [{ "path": "/api/cron/purge", "schedule": "0 3 * * *" }]
+}
