@@ -27,13 +27,15 @@ export async function GET(request: Request) {
   const comments = await db.comment.deleteMany({ where: older });
   const sessions = await db.session.deleteMany({ where: { expires: { lt: new Date() } } });
 
-  // Connected apps: spent codes and tokens, connections revoked over 30 days
-  // ago, and apps that registered but were never approved within a day.
+  // Connected apps: spent codes and tokens, connections revoked (or left with
+  // no tokens) over 30 days ago, and apps never approved within a day.
   const now = new Date();
   const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const oauthCodes = await db.oAuthCode.deleteMany({ where: { expiresAt: { lt: now } } });
   const oauthTokens = await db.oAuthToken.deleteMany({ where: { OR: [{ expiresAt: { lt: now } }, { usedAt: { lt: dayAgo } }] } });
-  const oauthGrants = await db.oAuthGrant.deleteMany({ where: { revokedAt: { lt: cutoff } } });
+  const oauthGrants = await db.oAuthGrant.deleteMany({
+    where: { OR: [{ revokedAt: { lt: cutoff } }, { createdAt: { lt: cutoff }, tokens: { none: {} } }] },
+  });
   const oauthClients = await db.oAuthClient.deleteMany({ where: { createdAt: { lt: dayAgo }, grants: { none: {} } } });
 
   const summary = {

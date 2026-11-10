@@ -77,7 +77,7 @@ async function Consent({ searchParams }: Pick<PageProps<"/oauth/authorize">, "se
         <ShieldCheck className="size-4 shrink-0" />
         <span>
           After you allow it, you&apos;ll go back to <span className="font-medium text-foreground">{returnHost}</span>. Only connect apps you
-          trust. You can disconnect it at any time.
+          trust. You can disconnect it at any time from Connected apps in your account menu.
         </span>
       </p>
 
