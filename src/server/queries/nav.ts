@@ -2,13 +2,14 @@ import "server-only";
 import { cache } from "react";
 import { db } from "@/server/db";
 import { isAppAdmin, isSuperAdmin, visibleBoardWhere, visibleWorkspaceWhere, type Actor } from "@/server/access";
+import { countPendingLeave } from "@/server/queries/leave";
 
 // Everything the sidebar needs: the workspaces and boards this person can
 // see, with what they may do there. cache() dedupes the layout's and the
 // page's calls within one request (requireUser() returns the same object).
 export const getNavData = cache(async (user: Actor) => {
   const superAdmin = isSuperAdmin(user);
-  const [workspaces, favorites] = await Promise.all([
+  const [workspaces, favorites, pendingLeave] = await Promise.all([
     db.workspace.findMany({
       where: { deletedAt: null, ...visibleWorkspaceWhere(user) },
       orderBy: { position: "asc" },
@@ -29,6 +30,7 @@ export const getNavData = cache(async (user: Actor) => {
       orderBy: { createdAt: "asc" },
       select: { boardId: true },
     }),
+    countPendingLeave(user),
   ]);
 
   return {
@@ -46,6 +48,7 @@ export const getNavData = cache(async (user: Actor) => {
     }),
     favoriteBoardIds: favorites.map((f) => f.boardId),
     canCreateWorkspaces: isAppAdmin(user),
+    pendingLeave,
   };
 });
 

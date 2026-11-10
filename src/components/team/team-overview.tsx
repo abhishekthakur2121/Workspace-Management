@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronRight, UsersRound } from "lucide-react";
+import { ChevronRight, Plane, UsersRound } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { SearchField } from "@/components/ui/search-field";
 import { addDaysISO, todayISO } from "@/lib/dates";
+import { partOnDay } from "@/lib/leave";
 import { ROLE_LABELS } from "@/lib/roles";
 import type { WorkloadPerson } from "@/server/queries/workload";
 import { cn } from "@/lib/utils";
@@ -63,7 +64,10 @@ export function TeamOverview({ people }: { people: WorkloadPerson[] }) {
                     <span className="flex min-w-0 items-center gap-3 px-4">
                       <Avatar name={name} image={p.image} className="size-8" />
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium">{name}</span>
+                        <span className="flex items-center gap-2">
+                          <span className="truncate text-sm font-medium">{name}</span>
+                          <OnLeave leave={p.leave} />
+                        </span>
                         <span className="block truncate text-xs text-muted">
                           {p.name ? `${p.email} · ` : ""}
                           {ROLE_LABELS[p.role]}
@@ -97,6 +101,17 @@ function Count({ value, label, tone }: { value: number; label: string; tone?: "d
         {value}
         <span className="md:hidden"> {label}</span>
       </span>
+    </span>
+  );
+}
+
+function OnLeave({ leave }: { leave: WorkloadPerson["leave"] }) {
+  const today = todayISO();
+  const part = leave.map((l) => partOnDay(l, today)).find(Boolean);
+  if (!part) return null;
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#579bfc]/15 px-2 py-0.5 text-[11px] font-medium text-[#579bfc]">
+      <Plane className="size-3" /> On leave{part === "full" ? "" : ` (${part})`}
     </span>
   );
 }
