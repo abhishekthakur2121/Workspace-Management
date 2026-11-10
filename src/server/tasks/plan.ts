@@ -13,7 +13,7 @@ export type Write = Prisma.PrismaPromise<unknown>;
 const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
 
 
-export async function planPatch(taskId: string, patch: TaskPatch, actorId: string): Promise<Write[]> {
+export async function planPatch(taskId: string, patch: TaskPatch, actorId: string, via?: string | null): Promise<Write[]> {
   const task = await db.task.findFirstOrThrow({
     where: { id: taskId, deletedAt: null },
     select: {
@@ -80,7 +80,7 @@ export async function planPatch(taskId: string, patch: TaskPatch, actorId: strin
   }
   if (!changes.length) return [];
 
-  const log = await Promise.all(changes.map((c) => activity({ taskId, boardId: task.boardId, actorId, action: "updated", ...c })));
+  const log = await Promise.all(changes.map((c) => activity({ taskId, boardId: task.boardId, actorId, action: "updated", via, ...c })));
   return [db.task.update({ where: { id: taskId }, data }), ...writes, db.activity.createMany({ data: log })];
 }
 

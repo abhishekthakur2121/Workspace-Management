@@ -35,6 +35,7 @@ export function Updates({
     const temp: ThreadComment = {
       id: `temp-${crypto.randomUUID()}`,
       body,
+      via: null,
       createdAt: new Date().toISOString(),
       editedAt: null,
       author: { id: currentUserId, name: me?.name ?? null, email: me?.email ?? "", image: me?.image ?? null, active: true },
@@ -141,6 +142,7 @@ function CommentItem({ comment, setThread }: { comment: ThreadComment; setThread
           <p className="truncate text-sm font-semibold">{name}</p>
           <p className="text-xs text-muted" title={fullDate(comment.createdAt)}>
             {pending ? "Posting…" : timeAgo(comment.createdAt)}
+            {comment.via && ` · via ${comment.via}`}
             {comment.editedAt && " · edited"}
           </p>
         </div>

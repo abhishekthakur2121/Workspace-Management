@@ -60,6 +60,8 @@ model User {
 
   leaveRequests LeaveRequest[]
   leaveEvents   LeaveEvent[]
+
+  oauthGrants OAuthGrant[]
 }
 
 // Uploaded profile picture, kept out of the User row so loading a user (on
@@ -317,6 +319,7 @@ model Comment {
   taskId    String
   authorId  String? // null once the author is permanently deleted
   body      String
+  via       String? // name of the connected app it was posted through, if any
   createdAt DateTime  @default(now())
   editedAt  DateTime?
   deletedAt DateTime?
@@ -337,6 +340,7 @@ model Activity {
   field     String?
   oldValue  Json?
   newValue  Json?
+  via       String? // name of the connected app the change came through, if any
   createdAt DateTime @default(now())
 
   task  Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -452,4 +456,76 @@ model AppSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// ─── Connected apps (OAuth for the MCP endpoint) ────────────────────────────
+// Apps such as AI assistants connect to /api/mcp on a person's behalf. The
+// person signs in and approves the app once; the app then gets short-lived
+// access tokens and a refresh token. Codes and tokens are stored only as
+// SHA-256 hashes, so a database leak doesn't expose working credentials.
+
+// An app that can ask for access: registered by the app itself (id generated
+// here), or identified by the URL of its published metadata (id = that URL).
+model OAuthClient {
+  id           String    @id
+  name         String
+  redirectUris String[]
+  fromMetadata Boolean   @default(false)
+  fetchedAt    DateTime? // when the published metadata was last read
+  createdAt    DateTime  @default(now())
+
+  grants OAuthGrant[]
+  codes  OAuthCode[]
+}
+
+// One approval: a person connected one app. Revoking it ends all its tokens.
+model OAuthGrant {
+  id         String    @id @default(cuid())
+  userId     String
+  clientId   String
+  scopes     String[]
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client OAuthClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tokens OAuthToken[]
+  codes  OAuthCode[]
+
+  @@index([userId])
+}
+
+// The one-time code handed back to the app after approval, swapped for tokens.
+model OAuthCode {
+  hash          String    @id
+  clientId      String
+  userId        String
+  redirectUri   String
+  codeChallenge String // PKCE, S256
+  scopes        String[]
+  expiresAt     DateTime
+  usedAt        DateTime?
+  grantId       String? // set once exchanged, to revoke it if the code is replayed
+
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  grant  OAuthGrant? @relation(fields: [grantId], references: [id], onDelete: Cascade)
+}
+
+enum OAuthTokenKind {
+  access
+  refresh
+}
+
+model OAuthToken {
+  hash      String         @id
+  grantId   String
+  kind      OAuthTokenKind
+  expiresAt DateTime
+  usedAt    DateTime? // refresh tokens: when it was swapped for a new pair
+  createdAt DateTime       @default(now())
+
+  grant OAuthGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@index([grantId])
 }
