@@ -4,9 +4,9 @@ import { startTransition, useState } from "react";
 import { Check, Copy, Loader2, Unplug } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { disconnectApp } from "@/server/actions/connected-apps";
+import { revokeApp } from "@/server/actions/connected-apps";
 
-// The address apps connect to, ready to copy into an app's connector settings.
+// The MCP server URL, ready to copy into an app's connector settings.
 export function ConnectorAddress({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -16,7 +16,7 @@ export function ConnectorAddress({ url }: { url: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      toast.error("Couldn't copy. Select the address and copy it instead.");
+      toast.error("Couldn't copy. Select the URL and copy it instead.");
     }
   }
 
@@ -25,7 +25,7 @@ export function ConnectorAddress({ url }: { url: string }) {
       <input
         readOnly
         value={url}
-        aria-label="Connector address"
+        aria-label="MCP server URL"
         onFocus={(e) => e.target.select()}
         className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background/60 px-3 font-mono text-xs outline-none"
       />
@@ -36,19 +36,19 @@ export function ConnectorAddress({ url }: { url: string }) {
   );
 }
 
-export function DisconnectButton({ id, name, active }: { id: string; name: string; active: boolean }) {
+export function RevokeButton({ id, name }: { id: string; name: string }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  function disconnect() {
+  function revoke() {
     setBusy(true);
     startTransition(async () => {
       try {
-        const result = await disconnectApp({ id });
+        const result = await revokeApp({ id });
         if ("error" in result) toast.error(result.error);
-        else toast.success(`${name} disconnected`);
+        else toast.success(`Access revoked for ${name}`);
       } catch {
-        toast.error("Couldn't disconnect. Please try again.");
+        toast.error("Couldn't revoke access. Please try again.");
       } finally {
         setBusy(false);
         setConfirming(false);
@@ -59,17 +59,17 @@ export function DisconnectButton({ id, name, active }: { id: string; name: strin
   if (!confirming) {
     return (
       <Button variant="ghost" size="sm" onClick={() => setConfirming(true)}>
-        <Unplug className="size-4" /> {active ? "Disconnect" : "Remove"}
+        <Unplug className="size-4" /> Revoke
       </Button>
     );
   }
   return (
     <div className="flex items-center gap-1">
-      <Button variant="danger" size="sm" onClick={disconnect} disabled={busy}>
-        {busy && <Loader2 className="size-4 animate-spin" />} {active ? "Disconnect" : "Remove"}
+      <Button variant="danger" size="sm" onClick={revoke} disabled={busy}>
+        {busy && <Loader2 className="size-4 animate-spin" />} Revoke
       </Button>
       <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={busy}>
-        Keep
+        Cancel
       </Button>
     </div>
   );

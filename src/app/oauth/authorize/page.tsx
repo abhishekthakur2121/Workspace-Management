@@ -12,9 +12,9 @@ import { originOf } from "@/server/oauth/config";
 import { parseAuthorizeRequest } from "@/server/oauth/authorize";
 import { approveConnection, declineConnection } from "@/server/actions/oauth";
 
-export const metadata: Metadata = { title: "Connect an app" };
+export const metadata: Metadata = { title: "Authorize app" };
 
-// Where an app sends someone to approve access (the OAuth authorization
+// Where an app sends someone to authorize access (the OAuth authorization
 // endpoint). Signed-out visitors are sent to sign in first and come back here.
 export default function AuthorizePage({ searchParams }: PageProps<"/oauth/authorize">) {
   return (
@@ -42,7 +42,7 @@ async function Consent({ searchParams }: Pick<PageProps<"/oauth/authorize">, "se
     if ("redirect" in parsed) redirect(parsed.redirect);
     return (
       <>
-        <h1 className="text-xl font-semibold">Can&apos;t connect this app</h1>
+        <h1 className="text-xl font-semibold">Can&apos;t authorize this app</h1>
         <p className="mt-2 text-sm text-muted">{parsed.message}</p>
       </>
     );
@@ -53,9 +53,9 @@ async function Consent({ searchParams }: Pick<PageProps<"/oauth/authorize">, "se
   const name = user.name ?? user.email ?? "";
   return (
     <>
-      <h1 className="text-xl font-semibold">Connect {client.name}?</h1>
+      <h1 className="text-xl font-semibold">Authorize {client.name}</h1>
       <p className="mt-1 text-sm text-muted">
-        <span className="font-medium text-foreground">{client.name}</span> wants to use Nxt Workspace Manager as you.
+        <span className="font-medium text-foreground">{client.name}</span> wants to access your Nxt Workspace Manager account.
       </p>
 
       <div className="mt-5 flex items-center gap-3 rounded-xl bg-background/60 p-3">
@@ -66,18 +66,18 @@ async function Consent({ searchParams }: Pick<PageProps<"/oauth/authorize">, "se
         </div>
       </div>
 
-      <p className="mt-5 text-sm font-medium">It will be able to</p>
+      <p className="mt-5 text-sm font-medium">This will allow {client.name} to</p>
       <ul className="mt-2 space-y-2 text-sm">
-        <Permission ok>See the boards and tasks you can see</Permission>
-        <Permission ok>Create and update tasks, and add comments, in your name</Permission>
-        <Permission>It can&apos;t delete anything, or see your password</Permission>
+        <Permission ok>Read boards and tasks you have access to</Permission>
+        <Permission ok>Create and update tasks, and post comments as you</Permission>
+        <Permission>It can&apos;t delete anything or see your password</Permission>
       </ul>
 
       <p className="mt-5 flex gap-2 text-xs text-muted">
         <ShieldCheck className="size-4 shrink-0" />
         <span>
-          After you allow it, you&apos;ll go back to <span className="font-medium text-foreground">{returnHost}</span>. Only connect apps you
-          trust. You can disconnect it at any time from Connected apps in your account menu.
+          Authorizing will redirect to <span className="font-medium text-foreground">{returnHost}</span>. Only authorize apps you trust. You can
+          revoke access at any time in Connected apps, in your account menu.
         </span>
       </p>
 
@@ -88,7 +88,7 @@ async function Consent({ searchParams }: Pick<PageProps<"/oauth/authorize">, "se
           </Button>
         </form>
         <form action={approveConnection.bind(null, params)}>
-          <Button type="submit">Allow</Button>
+          <Button type="submit">Authorize</Button>
         </form>
       </div>
     </>

@@ -459,9 +459,9 @@ model AppSetting {
 }
 
 // ─── Connected apps (OAuth for the MCP endpoint) ────────────────────────────
-// Apps such as AI assistants connect to /api/mcp on a person's behalf. The
-// person signs in and approves the app once; the app then gets short-lived
-// access tokens and a refresh token. Codes and tokens are stored only as
+// Other apps connect to /api/mcp on a person's behalf. The person signs in
+// and authorizes the app once; the app then gets short-lived access tokens
+// and a refresh token. Codes and tokens are stored only as
 // SHA-256 hashes, so a database leak doesn't expose working credentials.
 
 // An app that can ask for access: registered by the app itself (id generated

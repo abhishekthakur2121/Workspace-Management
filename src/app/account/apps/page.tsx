@@ -6,21 +6,21 @@ import { Plug } from "lucide-react";
 import { requireUser } from "@/server/auth-guard";
 import { getConnectedApps } from "@/server/queries/connected-apps";
 import { endpoints, originOf } from "@/server/oauth/config";
-import { ConnectorAddress, DisconnectButton } from "@/components/account/connected-apps";
+import { ConnectorAddress, RevokeButton } from "@/components/account/connected-apps";
 import { timeAgo } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Connected apps" };
 
-// Apps the person has allowed to work as them (through /api/mcp), how to
-// connect one, and a way to disconnect each.
+// Apps the person has authorized to work as them (through /api/mcp), the URL
+// to connect one, and a way to revoke each.
 export default function ConnectedAppsPage() {
   return (
     <main className="flex flex-1 items-center justify-center p-4">
       <div className="anim-dialog w-full max-w-lg rounded-2xl border border-grid bg-surface p-8 shadow-xl shadow-black/5">
         <h1 className="text-2xl font-semibold">Connected apps</h1>
         <p className="mt-1 text-sm text-muted">
-          Apps such as Claude that you&apos;ve allowed to use Nxt Workspace Manager as you. They see and change only what you can, can&apos;t
-          delete anything, and every change shows in the task history as &ldquo;via&rdquo; the app.
+          Apps you&apos;ve authorized to access your account. An app can only see and change what you can, and it can&apos;t delete
+          anything. Changes it makes are labelled with its name in the task history.
         </p>
         <Suspense fallback={<div className="skeleton mt-6 h-64 rounded-xl" />}>
           <Body />
@@ -36,18 +36,17 @@ async function Body() {
   return (
     <>
       <section className="mt-6 rounded-xl bg-background/60 p-4">
-        <h2 className="text-sm font-semibold">Connect an app</h2>
+        <h2 className="text-sm font-semibold">MCP server URL</h2>
         <p className="mt-1 text-sm text-muted">
-          In Claude, open <span className="font-medium text-foreground">Settings → Connectors → Add custom connector</span>, paste this address,
-          then choose <span className="font-medium text-foreground">Connect</span> and allow access. On a Claude Team or Enterprise plan, an
-          owner adds it once for everyone. Other apps that support MCP connectors use the same address.
+          To connect an app that supports MCP, add this URL in the app&apos;s connector settings. You&apos;ll be asked to sign in and authorize
+          access.
         </p>
         <ConnectorAddress url={endpoints(origin).resource} />
       </section>
 
-      <h2 className="mt-6 text-sm font-semibold">Your connections</h2>
+      <h2 className="mt-6 text-sm font-semibold">Authorized apps</h2>
       {apps.length === 0 ? (
-        <p className="mt-2 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted">No apps connected yet.</p>
+        <p className="mt-2 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted">You haven&apos;t authorized any apps.</p>
       ) : (
         <ul className="mt-2 divide-y divide-grid rounded-xl border border-grid">
           {apps.map((app) => (
@@ -61,18 +60,18 @@ async function Body() {
                   {!app.active && <span className="ml-2 rounded-full bg-hover px-2 py-0.5 text-xs font-normal text-muted">Expired</span>}
                 </p>
                 <p className="text-xs text-muted">
-                  Connected {timeAgo(app.connectedAt)}
+                  Authorized {timeAgo(app.connectedAt)}
                   {" · "}
-                  {app.lastUsedAt ? `last used ${timeAgo(app.lastUsedAt)}` : "not used yet"}
+                  {app.lastUsedAt ? `Last used ${timeAgo(app.lastUsedAt)}` : "Never used"}
                 </p>
               </div>
-              <DisconnectButton id={app.id} name={app.name} active={app.active} />
+              <RevokeButton id={app.id} name={app.name} />
             </li>
           ))}
         </ul>
       )}
       {apps.some((a) => !a.active) && (
-        <p className="mt-2 text-xs text-muted">Expired connections haven&apos;t been used for 30 days. Connect again from the app to use it.</p>
+        <p className="mt-2 text-xs text-muted">Access expires after 30 days without use. To use an expired app again, connect it again from the app.</p>
       )}
 
       <Link href="/" className="mt-6 inline-block text-sm text-muted hover:text-foreground">
