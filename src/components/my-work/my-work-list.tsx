@@ -42,7 +42,8 @@ export function bucketize(tasks: MyTask[]): Bucket[] {
 
 export const isDone = (t: MyTask) => !!t.board.statuses.find((s) => s.id === t.statusId)?.isDone;
 
-export function MyWorkList({ tasks: initial }: { tasks: MyTask[] }) {
+// `personName` is set when a super admin views someone else's list (Team page).
+export function MyWorkList({ tasks: initial, personName }: { tasks: MyTask[]; personName?: string }) {
   const router = useRouter();
   const [tasks, applyOptimistic] = useOptimistic(initial, (state: MyTask[], edit: { id: string; patch: TaskPatch }) =>
     state.map((t) => (t.id === edit.id ? ({ ...t, ...edit.patch } as MyTask) : t)),
@@ -69,11 +70,12 @@ export function MyWorkList({ tasks: initial }: { tasks: MyTask[] }) {
   );
   const doneCount = tasks.filter(isDone).length;
   const buckets = bucketize(visible).filter((b) => b.tasks.length > 0);
+  const searchLabel = personName ? "Search their tasks" : "Search my tasks";
 
   return (
     <div className="space-y-6 p-6">
       <div className="flex flex-wrap items-center gap-3">
-        <SearchField value={query} onChange={setQuery} placeholder="Search my tasks" label="Search my tasks" inputClassName="w-44" />
+        <SearchField value={query} onChange={setQuery} placeholder={searchLabel} label={searchLabel} inputClassName="w-44" />
         <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-muted select-none">
           <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} className="size-4 accent-primary" />
           Show done{doneCount ? ` (${doneCount})` : ""}
@@ -83,9 +85,15 @@ export function MyWorkList({ tasks: initial }: { tasks: MyTask[] }) {
       {buckets.length === 0 ? (
         <div className="card-shadow grid place-items-center rounded-xl border border-grid bg-surface px-6 py-14 text-center">
           <PartyPopper className="size-8 text-primary" />
-          <p className="mt-3 font-medium">{q ? "No tasks match your search" : "You're all caught up"}</p>
+          <p className="mt-3 font-medium">
+            {q ? "No tasks match your search" : personName ? `${personName} is all caught up` : "You're all caught up"}
+          </p>
           <p className="mt-1 text-sm text-muted">
-            {q ? "Try another word." : "Tasks where you're accountable or responsible will show up here."}
+            {q
+              ? "Try another word."
+              : personName
+                ? "Tasks where they're accountable or responsible will show up here."
+                : "Tasks where you're accountable or responsible will show up here."}
           </p>
         </div>
       ) : (
@@ -107,7 +115,7 @@ export function MyWorkList({ tasks: initial }: { tasks: MyTask[] }) {
                   <div className="hidden h-9 grid-cols-[minmax(240px,1fr)_200px_110px_150px_120px_130px] border-b border-grid text-xs font-medium text-muted md:grid">
                     <div className="flex items-center px-4">Task</div>
                     <div className="flex items-center px-3">Board</div>
-                    <div className="grid place-items-center">My role</div>
+                    <div className="grid place-items-center">{personName ? "Role" : "My role"}</div>
                     <div className="grid place-items-center">Status</div>
                     <div className="grid place-items-center">Due date</div>
                     <div className="grid place-items-center">Priority</div>

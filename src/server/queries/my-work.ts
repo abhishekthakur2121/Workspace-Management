@@ -4,13 +4,18 @@ import { visibleBoardWhere, type Actor } from "@/server/access";
 
 // Every live task or subtask where the user is accountable or responsible,
 // on boards they can still see, soonest due first (no date last).
-export async function getMyWork(user: Actor) {
-  const userId = user.id;
+export function getMyWork(user: Actor) {
+  return getAssignedTasks(user, user.id);
+}
+
+// The same list for any person, limited to boards the viewer can see. Super
+// admins see every board, so the Team page shows a person's whole workload.
+export async function getAssignedTasks(viewer: Actor, userId: string) {
   const tasks = await db.task.findMany({
     where: {
       deletedAt: null,
       group: { deletedAt: null },
-      board: { deletedAt: null, workspace: { deletedAt: null }, ...visibleBoardWhere(user) },
+      board: { deletedAt: null, workspace: { deletedAt: null }, ...visibleBoardWhere(viewer) },
       AND: [
         { OR: [{ parentId: null }, { parent: { deletedAt: null } }] },
         { OR: [{ accountableId: userId }, { responsible: { some: { userId } } }] },

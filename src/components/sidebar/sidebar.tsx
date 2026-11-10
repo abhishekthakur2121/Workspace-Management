@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Check, ChevronDown, Home, KeyRound, ListChecks, LogOut, Menu as MenuIcon, Monitor, Moon, Plus, Shield, Star, Sun, UserRound, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, Home, KeyRound, ListChecks, LogOut, Menu as MenuIcon, Monitor, Moon, Plus, Shield, Star, Sun, UserRound, UsersRound, X } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { BrandLogo } from "@/components/brand-logo";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
@@ -15,10 +15,9 @@ import type { NavData } from "@/server/queries/nav";
 import { cn } from "@/lib/utils";
 import { usePersistentState } from "@/lib/use-persistent-state";
 import { DEFAULT_THEME, THEME_KEY, applyTheme, type Theme } from "@/lib/theme";
+import { ROLE_LABELS } from "@/lib/roles";
 
 type User = { name?: string | null; email?: string | null; image?: string | null; role: "super_admin" | "admin" | "user" };
-
-const ROLE_LABELS = { super_admin: "Super admin", admin: "Admin", user: "User" } as const;
 
 const LAST_WORKSPACE_KEY = "wm:lastWorkspace";
 const noopSubscribe = () => () => {};
@@ -103,6 +102,10 @@ function Sidebar({ user, nav, onClose }: { user: User; nav: NavData; onClose: ()
       <nav className="space-y-0.5 px-2">
         <NavItem href="/" icon={<Home />} label="Home" active={pathname === "/"} />
         <NavItem href="/my-work" icon={<ListChecks />} label="My work" active={pathname === "/my-work"} />
+        <NavItem href={nav.pendingLeave ? "/leave?tab=approvals" : "/leave"} icon={<CalendarDays />} label="Leave" active={pathname === "/leave"} badge={nav.pendingLeave} />
+        {user.role === "super_admin" && (
+          <NavItem href="/team" icon={<UsersRound />} label="Team" active={pathname.startsWith("/team")} />
+        )}
         {user.role !== "user" && (
           <NavItem href="/admin/users" icon={<Shield />} label="Users" active={pathname.startsWith("/admin")} />
         )}
@@ -195,7 +198,7 @@ function Sidebar({ user, nav, onClose }: { user: User; nav: NavData; onClose: ()
   );
 }
 
-function NavItem({ href, icon, label, active }: { href: string; icon: React.ReactNode; label: string; active: boolean }) {
+function NavItem({ href, icon, label, active, badge }: { href: string; icon: React.ReactNode; label: string; active: boolean; badge?: number }) {
   return (
     <Link
       href={href}
@@ -207,7 +210,12 @@ function NavItem({ href, icon, label, active }: { href: string; icon: React.Reac
       )}
     >
       {icon}
-      {label}
+      <span className="flex-1">{label}</span>
+      {!!badge && (
+        <span aria-label={`${badge} waiting for approval`} className="rounded-full bg-primary px-1.5 text-[11px] font-semibold text-white">
+          {badge}
+        </span>
+      )}
     </Link>
   );
 }

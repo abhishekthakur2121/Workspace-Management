@@ -57,6 +57,9 @@ model User {
   boardMemberships     BoardMember[]
   createdWorkspaces    Workspace[]       @relation("WorkspaceCreatedBy")
   createdBoards        Board[]           @relation("BoardCreatedBy")
+
+  leaveRequests LeaveRequest[]
+  leaveEvents   LeaveEvent[]
 }
 
 // Uploaded profile picture, kept out of the User row so loading a user (on
@@ -366,4 +369,87 @@ model BoardVisit {
 
   @@id([userId, boardId])
   @@index([userId, visitedAt])
+}
+
+// ─── Leave ──────────────────────────────────────────────────────────────────
+// People request leave; super admins approve it. Approved leave shows on the
+// team calendar and in the calendar feed (who and when only; the type and
+// note are visible to the person and super admins).
+
+enum LeaveType {
+  holiday
+  sick
+  personal
+  other
+}
+
+enum LeaveStatus {
+  pending
+  approved
+  rejected
+  cancelled // by the person, before it started
+  revoked // by a super admin, after approval
+}
+
+// Which part of a day is taken. A multi-day request may start in the
+// afternoon and end in the morning; a one-day request is a full day, a
+// morning or an afternoon (startPart = endPart).
+enum DayPart {
+  full
+  morning
+  afternoon
+}
+
+model LeaveRequest {
+  id        String      @id @default(cuid())
+  userId    String
+  type      LeaveType
+  startDate DateTime    @db.Date
+  endDate   DateTime    @db.Date
+  startPart DayPart     @default(full)
+  endPart   DayPart     @default(full)
+  note      String?
+  status    LeaveStatus @default(pending)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events LeaveEvent[]
+
+  @@index([userId, startDate])
+  @@index([status, startDate])
+  @@index([startDate, endDate])
+}
+
+enum LeaveAction {
+  requested
+  approved
+  auto_approved // a super admin's own request when no other super admin exists
+  rejected
+  cancelled
+  revoked
+}
+
+// The audit trail: append-only. actorName is kept so the history still says
+// who acted after that person's account is deleted.
+model LeaveEvent {
+  id        String      @id @default(cuid())
+  requestId String
+  action    LeaveAction
+  actorId   String?
+  actorName String
+  note      String?
+  createdAt DateTime    @default(now())
+
+  request LeaveRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actor   User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([requestId, createdAt])
+}
+
+// Small app-wide settings, e.g. the secret in the leave calendar feed link.
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
