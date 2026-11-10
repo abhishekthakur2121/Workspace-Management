@@ -16,7 +16,8 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except sign-in, auth/health/cron/calendar APIs, Next internals
-  // and static files. The cron and calendar routes check their own secrets.
-  matcher: ["/((?!signin|api/auth|api/health|api/cron|api/calendar|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  // Everything except sign-in, auth/health/cron/calendar/MCP/OAuth APIs, the
+  // OAuth discovery documents, Next internals and static files. The cron,
+  // calendar and MCP routes check their own secrets or tokens.
+  matcher: ["/((?!signin|api/auth|api/health|api/cron|api/calendar|api/mcp|api/oauth|\\.well-known|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };

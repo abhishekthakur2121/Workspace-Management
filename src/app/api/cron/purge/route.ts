@@ -27,6 +27,15 @@ export async function GET(request: Request) {
   const comments = await db.comment.deleteMany({ where: older });
   const sessions = await db.session.deleteMany({ where: { expires: { lt: new Date() } } });
 
+  // Connected apps: spent codes and tokens, connections revoked over 30 days
+  // ago, and apps that registered but were never approved within a day.
+  const now = new Date();
+  const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const oauthCodes = await db.oAuthCode.deleteMany({ where: { expiresAt: { lt: now } } });
+  const oauthTokens = await db.oAuthToken.deleteMany({ where: { OR: [{ expiresAt: { lt: now } }, { usedAt: { lt: dayAgo } }] } });
+  const oauthGrants = await db.oAuthGrant.deleteMany({ where: { revokedAt: { lt: cutoff } } });
+  const oauthClients = await db.oAuthClient.deleteMany({ where: { createdAt: { lt: dayAgo }, grants: { none: {} } } });
+
   const summary = {
     workspaces: workspaces.count,
     boards: boards.count,
@@ -34,6 +43,10 @@ export async function GET(request: Request) {
     tasks: tasks.count,
     comments: comments.count,
     expiredSessions: sessions.count,
+    oauthCodes: oauthCodes.count,
+    oauthTokens: oauthTokens.count,
+    oauthGrants: oauthGrants.count,
+    oauthClients: oauthClients.count,
   };
   console.log("purge-deleted", JSON.stringify(summary));
   return Response.json(summary);
