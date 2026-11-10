@@ -50,6 +50,7 @@ export async function activity(entry: {
   field?: Field;
   from?: unknown;
   to?: unknown;
+  via?: string | null; // the connected app the change came through
 }): Promise<Prisma.ActivityCreateManyInput> {
   const [oldValue, newValue] = entry.field
     ? await Promise.all([snapshot(entry.field, entry.from), snapshot(entry.field, entry.to)])
@@ -62,5 +63,6 @@ export async function activity(entry: {
     field: entry.field ? (FIELD_NAMES[entry.field] ?? entry.field) : null,
     oldValue,
     newValue,
+    via: entry.via ?? null,
   };
 }

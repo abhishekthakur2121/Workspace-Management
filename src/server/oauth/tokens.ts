@@ -98,6 +98,7 @@ export async function findAccessToken(token: string) {
           scopes: true,
           revokedAt: true,
           lastUsedAt: true,
+          client: { select: { name: true } },
           user: { select: { id: true, role: true, name: true, email: true, active: true, mustChangePassword: true } },
         },
       },

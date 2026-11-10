@@ -319,6 +319,7 @@ model Comment {
   taskId    String
   authorId  String? // null once the author is permanently deleted
   body      String
+  via       String? // name of the connected app it was posted through, if any
   createdAt DateTime  @default(now())
   editedAt  DateTime?
   deletedAt DateTime?
@@ -339,6 +340,7 @@ model Activity {
   field     String?
   oldValue  Json?
   newValue  Json?
+  via       String? // name of the connected app the change came through, if any
   createdAt DateTime @default(now())
 
   task  Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)

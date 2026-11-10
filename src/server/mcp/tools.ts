@@ -2,23 +2,35 @@ import "server-only";
 import { z } from "zod";
 import type { CallToolResult, McpServer } from "@modelcontextprotocol/server";
 import { db } from "@/server/db";
-import { AccessError, visibleBoardWhere, type Actor } from "@/server/access";
+import { AccessError, assertCanSeeBoard, boardAudience, visibleBoardWhere, type Actor } from "@/server/access";
 import { getMyWork } from "@/server/queries/my-work";
+import { createTaskAs, updateTaskAs } from "@/server/tasks/mutations";
+import { addCommentAs } from "@/server/tasks/comments";
+import { InvalidReferenceError } from "@/server/tasks/refs";
 import { callerOf, type McpCaller } from "@/server/mcp/auth";
 import type { Prisma } from "@/generated/prisma/client";
 
 // The tools a connected MCP client can call. Every tool acts as the signed-in
 // person and goes through the same visibility rules as the app, so a client
-// can never see or change more than that person could themselves.
+// can never see or change more than that person could themselves. Changes use
+// the app's own save code, so they're logged in the task history (marked with
+// the connected app's name) and show up on open boards. Nothing can be deleted.
 
 export const INSTRUCTIONS = `Nxt Workspace Manager is a work manager. Work is organised as
 workspaces > boards > groups (sections of a board) > tasks, and tasks can have subtasks.
 Each board has its own status labels; a status marked done means the task is finished.
 A task has one accountable person (who owns the outcome) and any number of responsible
 people (who do the work). Dates are YYYY-MM-DD. Use list_boards to find board, group and
-status ids, and include each task's url when you mention it, so people can open it.`;
+status ids, and find_people for people's ids, and include each task's url when you mention
+it, so people can open it. Changes are made in the signed-in person's name and shown in the
+task history, so only change what they asked for.`;
 
 const readOnly = { readOnlyHint: true, openWorldHint: false } as const;
+const additive = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } as const;
+
+const ref = z.string().min(1);
+const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+const priority = z.enum(["low", "medium", "high", "critical"]);
 
 export function registerTools(server: McpServer) {
   server.registerTool(
@@ -73,19 +85,93 @@ export function registerTools(server: McpServer) {
     },
     ({ task_id }, ctx) => run(() => getTask(callerOf(ctx), task_id)),
   );
+
+  server.registerTool(
+    "find_people",
+    {
+      title: "Find people",
+      description: "People who can be assigned tasks on a board (those who can see it), with their ids. Optionally filter by name or email.",
+      inputSchema: z.object({
+        board_id: z.string().min(1),
+        query: z.string().trim().min(1).max(100).optional().describe("Part of a name or email (case-insensitive)."),
+      }),
+      annotations: readOnly,
+    },
+    ({ board_id, query }, ctx) => run(() => findPeople(callerOf(ctx), board_id, query)),
+  );
+
+  server.registerTool(
+    "create_task",
+    {
+      title: "Create task",
+      description:
+        "Create a task (or a subtask) on a board, in your name. Unless given, it goes at the end of the board's first group, gets the board's first status, and you are accountable. Returns the new task.",
+      inputSchema: z.object({
+        board_id: z.string().min(1),
+        name: z.string().trim().min(1).max(500),
+        group_id: ref.optional().describe("Group (section) to add it to. Defaults to the board's first group."),
+        parent_task_id: ref.optional().describe("Makes it a subtask of this task (same board; subtasks can't have subtasks)."),
+        status_id: ref.optional(),
+        due: date.optional().describe("Due date, YYYY-MM-DD."),
+        priority: priority.optional(),
+        accountable_id: ref.optional().describe("Who owns the outcome. Defaults to you. Ids from find_people."),
+        responsible_ids: z.array(ref).max(50).optional().describe("Who does the work. Ids from find_people."),
+      }),
+      annotations: additive,
+    },
+    (args, ctx) => run(() => createTask(callerOf(ctx), args)),
+  );
+
+  server.registerTool(
+    "update_task",
+    {
+      title: "Update task",
+      description:
+        "Change a task's name, status, due date, priority or people. Only the fields you pass change; pass null to clear one. responsible_ids replaces the whole list, so include anyone who should stay. Returns the updated task.",
+      inputSchema: z.object({
+        task_id: z.string().min(1),
+        name: z.string().trim().min(1).max(500).optional(),
+        status_id: ref.nullable().optional(),
+        due: date.nullable().optional(),
+        priority: priority.nullable().optional(),
+        accountable_id: ref.nullable().optional(),
+        responsible_ids: z.array(ref).max(50).optional(),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    (args, ctx) => run(() => updateTask(callerOf(ctx), args)),
+  );
+
+  server.registerTool(
+    "add_comment",
+    {
+      title: "Add comment",
+      description: "Post an update (comment) on a task, in your name.",
+      inputSchema: z.object({ task_id: z.string().min(1), text: z.string().trim().min(1).max(5000) }),
+      annotations: additive,
+    },
+    ({ task_id, text }, ctx) => run(() => addComment(callerOf(ctx), task_id, text)),
+  );
 }
 
 // ─── results ────────────────────────────────────────────────────────────────
 
 class NotFound extends Error {}
 
-// Expected failures (no access, nothing found) go back to the client as the
-// message; anything else is logged and reported without details.
+// Expected failures (no access, nothing found, a bad id or value) go back to
+// the client as a message it can act on; anything else is logged and
+// reported without details.
 async function run(fn: () => Promise<unknown>): Promise<CallToolResult> {
   try {
     return { content: [{ type: "text", text: JSON.stringify(await fn()) }] };
   } catch (e) {
     if (e instanceof AccessError || e instanceof NotFound) return failure(e.message);
+    if (e instanceof InvalidReferenceError) {
+      return failure(
+        "A group, status or person isn't valid for this board (people must be able to see the board). Use list_boards and find_people for valid ids.",
+      );
+    }
+    if (e instanceof z.ZodError) return failure(z.prettifyError(e));
     console.error("MCP tool failed", e);
     return failure("Something went wrong. Please try again.");
   }
@@ -97,6 +183,7 @@ const failure = (text: string): CallToolResult => ({ content: [{ type: "text", t
 
 const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 const person = (u: { name: string | null; email: string } | null) => (u ? (u.name ?? u.email) : null);
+const personRef = (u: { id: string; name: string | null; email: string } | null) => (u ? { id: u.id, name: u.name ?? u.email } : null);
 const taskUrl = (caller: McpCaller, boardId: string, taskId: string) => `${caller.origin}/b/${boardId}?task=${taskId}`;
 
 // Live tasks on boards the person can see, as in My Work.
@@ -120,8 +207,8 @@ const summarySelect = {
   group: { select: { name: true } },
   board: { select: { id: true, name: true } },
   parent: { select: { id: true, name: true } },
-  accountable: { select: { name: true, email: true } },
-  responsible: { select: { user: { select: { name: true, email: true } } } },
+  accountable: { select: { id: true, name: true, email: true } },
+  responsible: { select: { user: { select: { id: true, name: true, email: true } } } },
 } satisfies Prisma.TaskSelect;
 
 function summary(caller: McpCaller, t: Prisma.TaskGetPayload<{ select: typeof summarySelect }>) {
@@ -135,8 +222,8 @@ function summary(caller: McpCaller, t: Prisma.TaskGetPayload<{ select: typeof su
     done: t.status?.isDone ?? false,
     due: day(t.dueDate),
     priority: t.priority,
-    accountable: person(t.accountable),
-    responsible: t.responsible.map((r) => person(r.user)),
+    accountable: personRef(t.accountable),
+    responsible: t.responsible.map((r) => personRef(r.user)),
     url: taskUrl(caller, t.board.id, t.id),
   };
 }
@@ -242,4 +329,112 @@ async function getTask(caller: McpCaller, taskId: string) {
     })),
     comments: t.comments.map((c) => ({ by: person(c.author), at: c.createdAt.toISOString(), text: c.body })),
   };
+}
+
+async function findPeople(caller: McpCaller, boardId: string, query?: string) {
+  await assertCanSeeBoard(caller, boardId);
+  const q = query?.toLowerCase();
+  const people = await db.user.findMany({
+    where: { id: { in: await boardAudience(boardId) } },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, email: true },
+  });
+  return people.filter((p) => !q || p.email.toLowerCase().includes(q) || p.name?.toLowerCase().includes(q));
+}
+
+// ─── changes ────────────────────────────────────────────────────────────────
+
+// Changes go to tasks the person can see, and only live ones.
+async function assertVisibleTask(
+  caller: McpCaller,
+  taskId: string,
+  where: Prisma.TaskWhereInput = {},
+  message = "No task with that id, or you can't see it.",
+) {
+  const task = await db.task.findFirst({ where: { AND: [{ id: taskId }, visibleTaskWhere(caller), where] }, select: { id: true } });
+  if (!task) throw new NotFound(message);
+}
+
+async function createTask(
+  caller: McpCaller,
+  args: {
+    board_id: string;
+    name: string;
+    group_id?: string;
+    parent_task_id?: string;
+    status_id?: string;
+    due?: string;
+    priority?: "low" | "medium" | "high" | "critical";
+    accountable_id?: string;
+    responsible_ids?: string[];
+  },
+) {
+  await assertCanSeeBoard(caller, args.board_id);
+  if (args.parent_task_id) {
+    const where = { boardId: args.board_id, parentId: null };
+    await assertVisibleTask(caller, args.parent_task_id, where, "The parent task isn't on that board, is itself a subtask, or you can't see it.");
+  }
+  const groupId =
+    args.group_id ??
+    (await db.group.findFirst({ where: { boardId: args.board_id, deletedAt: null }, orderBy: { position: "asc" }, select: { id: true } }))?.id;
+  if (!groupId) throw new NotFound("This board has no groups yet. Add one in the app first.");
+
+  // Check the people before creating anything, so a bad id doesn't leave a
+  // half-filled task behind.
+  const patch = {
+    dueDate: args.due,
+    priority: args.priority,
+    accountableId: args.accountable_id,
+    responsibleIds: args.responsible_ids,
+  };
+  const hasPatch = Object.values(patch).some((v) => v !== undefined);
+  if (args.accountable_id || args.responsible_ids?.length) {
+    const audience = await boardAudience(args.board_id);
+    if (![args.accountable_id, ...(args.responsible_ids ?? [])].every((id) => !id || audience.includes(id))) throw new InvalidReferenceError();
+  }
+
+  const { id } = await createTaskAs(
+    caller,
+    { boardId: args.board_id, groupId, name: args.name, parentId: args.parent_task_id, statusId: args.status_id },
+    caller.app,
+  );
+  if (hasPatch) await updateTaskAs(caller, { id, patch }, caller.app);
+  return getTask(caller, id);
+}
+
+async function updateTask(
+  caller: McpCaller,
+  args: {
+    task_id: string;
+    name?: string;
+    status_id?: string | null;
+    due?: string | null;
+    priority?: "low" | "medium" | "high" | "critical" | null;
+    accountable_id?: string | null;
+    responsible_ids?: string[];
+  },
+) {
+  await assertVisibleTask(caller, args.task_id);
+  await updateTaskAs(
+    caller,
+    {
+      id: args.task_id,
+      patch: {
+        name: args.name,
+        statusId: args.status_id,
+        dueDate: args.due,
+        priority: args.priority,
+        accountableId: args.accountable_id,
+        responsibleIds: args.responsible_ids,
+      },
+    },
+    caller.app,
+  );
+  return getTask(caller, args.task_id);
+}
+
+async function addComment(caller: McpCaller, taskId: string, text: string) {
+  await assertVisibleTask(caller, taskId);
+  const comment = await addCommentAs(caller, { taskId, body: text }, caller.app);
+  return { id: comment.id, posted_at: comment.createdAt.toISOString(), task_id: taskId };
 }

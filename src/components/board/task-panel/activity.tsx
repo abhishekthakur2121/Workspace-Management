@@ -23,6 +23,7 @@ export function ActivityLog({ items }: { items: ThreadActivity[] }) {
               <span className="font-semibold">{name}</span> <Describe a={a} />
               <p className="mt-0.5 text-xs text-muted" title={fullDate(a.createdAt)}>
                 {timeAgo(a.createdAt)}
+                {a.via && ` · via ${a.via}`}
               </p>
             </div>
           </li>

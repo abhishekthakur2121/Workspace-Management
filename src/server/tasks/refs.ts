@@ -2,6 +2,8 @@ import "server-only";
 import { db } from "@/server/db";
 import { boardAudience } from "@/server/access";
 
+export class InvalidReferenceError extends Error {}
+
 // Fails unless every referenced status/tag/group belongs to the board and every
 // person can see the board (so tasks are only assigned to people who can see them).
 export async function assertRefs(
@@ -20,6 +22,6 @@ export async function assertRefs(
     userIds.length ? boardAudience(boardId).then((audience) => userIds.filter((id) => audience.includes(id)).length) : 0,
   ]);
   if (s !== statusIds.length || t !== tagIds.length || g !== groupIds.length || u !== userIds.length) {
-    throw new Error("Invalid reference");
+    throw new InvalidReferenceError("Invalid reference");
   }
 }

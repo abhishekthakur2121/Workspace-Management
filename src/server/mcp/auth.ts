@@ -7,8 +7,9 @@ import type { Actor } from "@/server/access";
 import { findAccessToken } from "@/server/oauth/tokens";
 
 // The person an MCP request acts for. Tools only ever see this, so they run
-// with exactly that person's access, as if they were using the app.
-export type McpCaller = Actor & { name: string | null; email: string; origin: string };
+// with exactly that person's access, as if they were using the app. `app` is
+// the connected app's name, recorded on every change it makes.
+export type McpCaller = Actor & { name: string | null; email: string; origin: string; app: string };
 
 const LAST_USED_EVERY_MS = 5 * 60 * 1000;
 
@@ -27,7 +28,7 @@ export async function verifyMcpToken(req: Request, token?: string): Promise<Auth
   }
 
   const { id, role, name, email } = grant.user;
-  const caller: McpCaller = { id, role, name, email, origin: getPublicOrigin(req) };
+  const caller: McpCaller = { id, role, name, email, origin: getPublicOrigin(req), app: grant.client.name };
   return { token, clientId: grant.clientId, scopes: grant.scopes, expiresAt: grant.expiresAt, extra: { caller } };
 }
 
