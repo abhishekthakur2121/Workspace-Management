@@ -22,9 +22,9 @@ type Parsed =
 export async function parseAuthorizeRequest(params: Record<string, string | undefined>, origin: string): Promise<Parsed> {
   const { client_id, redirect_uri, state } = params;
   const client = client_id ? await findClient(client_id) : null;
-  if (!client) return { ok: false, message: "This app couldn't be identified, so it can't be connected." };
+  if (!client) return { ok: false, message: "The app couldn't be identified." };
   if (!redirect_uri || !redirectMatches(client.redirectUris, redirect_uri)) {
-    return { ok: false, message: "This app gave an address to return to that it didn't register, so it can't be connected." };
+    return { ok: false, message: "The app's redirect URL doesn't match the one it registered." };
   }
 
   const back = (error: string, description: string) => ({
@@ -61,7 +61,7 @@ export async function issueCode(request: AuthorizeRequest, userId: string, origi
 export function deniedRedirect(request: AuthorizeRequest, origin: string) {
   return withParams(request.redirectUri, {
     error: "access_denied",
-    error_description: "The person declined to connect this app.",
+    error_description: "The user denied the request.",
     state: request.state,
     iss: origin,
   });
